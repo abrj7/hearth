@@ -51,3 +51,75 @@ enum Tex {
             let S = CGFloat(size)
             let k = S / 4096
             ctx.setFillColor(color(base))
+            ctx.fill(CGRect(x: 0, y: 0, width: S, height: S))
+
+            // A shared flow field keeps neighbouring grain lines roughly parallel.
+            let waves: [(CGFloat, CGFloat, CGFloat, CGFloat)] = (0..<5).map { _ in
+                (r.f(3, 13) * k, CGFloat(Int(r.f(1, 3.99))), CGFloat(Int(r.f(0, 2.99))), r.f(0, 2 * .pi))
+            }
+            func warp(_ x: CGFloat, _ y: CGFloat) -> CGFloat {
+                var v: CGFloat = 0
+                for w in waves { v += w.0 * sin(2 * .pi * (w.1 * x / S + w.2 * y / S) + w.3) }
+                return v
+            }
+            func stroke(_ y0: CGFloat, _ width: CGFloat, _ c: CGColor) {
+                ctx.setStrokeColor(c)
+                ctx.setLineWidth(width)
+                for off in [-S, 0, S] {
+                    ctx.beginPath()
+                    var x: CGFloat = 0
+                    ctx.move(to: CGPoint(x: 0, y: y0 + off + warp(0, y0)))
+                    while x < S {
+                        x += S / 64
+                        ctx.addLine(to: CGPoint(x: x, y: y0 + off + warp(x, y0)))
+                    }
+                    ctx.strokePath()
+                }
+            }
+            let dark: RGB = (base.0 * 0.3, base.1 * 0.26, base.2 * 0.22)
+            let light: RGB = (min(1, base.0 * 1.55), min(1, base.1 * 1.6), min(1, base.2 * 1.7))
+
+            // Broad tonal bands.
+            for _ in 0..<110 {
+                let isDark = r.f(0, 1) < 0.55
+                stroke(r.f(0, S), r.f(30, 280) * k,
+                       color(isDark ? dark : light, isDark ? r.f(0.03, 0.10) : r.f(0.02, 0.07)))
+            }
+            // Grain lines.
+            for _ in 0..<3200 {
+                let isDark = r.f(0, 1) < 0.7
+                let w = (pow(r.f(0, 1), 3) * 7 + 0.8) * k
+                stroke(r.f(0, S), w, color(isDark ? dark : light, isDark ? r.f(0.04, 0.24) : r.f(0.03, 0.12)))
+            }
+            // Short fibres.
+            ctx.setLineWidth(max(1, k))
+            for _ in 0..<45000 {
+                let x = r.f(0, S), y = r.f(0, S), len = r.f(20, 150) * k
+                ctx.setStrokeColor(color(dark, r.f(0.03, 0.10)))
+                ctx.beginPath()
+                ctx.move(to: CGPoint(x: x, y: y + warp(x, y)))
+                ctx.addLine(to: CGPoint(x: x + len, y: y + warp(x + len, y)))
+                ctx.strokePath()
+            }
+        }
+    }
+
+    // MARK: Vinyl record
+
+    /// Tangent-space normal map of concentric grooves, with smooth gaps between "tracks".
+    static func grooveNormal(size: Int = 2048) -> CGImage {
+        var px = [UInt8](repeating: 255, count: size * size * 4)
+        let c = Double(size) / 2
+        var r = RNG(7)
+        let rings = 4096
+        let amp: [Double] = (0..<rings).map { _ in Double(r.f(0.45, 1)) }
+        let gaps: [Double] = [0.455, 0.57, 0.69, 0.80, 0.895]
+        px.withUnsafeMutableBufferPointer { buf in
+            for y in 0..<size {
+                for x in 0..<size {
+                    let dx = (Double(x) + 0.5 - c) / c
+                    let dy = (Double(y) + 0.5 - c) / c
+                    let rad = max(1e-6, (dx * dx + dy * dy).squareRoot())
+                    var slope = 0.0
+                    if rad > 0.37 && rad < 0.972 {
+                        var a = amp[Int(rad * Double(rings - 1))]
