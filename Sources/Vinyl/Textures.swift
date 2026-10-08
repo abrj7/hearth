@@ -123,3 +123,49 @@ enum Tex {
                     var slope = 0.0
                     if rad > 0.37 && rad < 0.972 {
                         var a = amp[Int(rad * Double(rings - 1))]
+                        for g in gaps where abs(rad - g) < 0.005 { a = 0 }
+                        slope = a * 0.85 * sin(rad * 2 * .pi * 150)
+                    }
+                    var nx = -slope * dx / rad, ny = -slope * dy / rad
+                    let inv = 1 / (nx * nx + ny * ny + 1).squareRoot()
+                    nx *= inv; ny *= inv
+                    let i = (y * size + x) * 4
+                    buf[i] = UInt8(max(0, min(255, (nx * 0.5 + 0.5) * 255)))
+                    buf[i + 1] = UInt8(max(0, min(255, (ny * 0.5 + 0.5) * 255)))
+                    buf[i + 2] = UInt8(max(0, min(255, (inv * 0.5 + 0.5) * 255)))
+                }
+            }
+        }
+        let provider = CGDataProvider(data: Data(px) as CFData)!
+        return CGImage(width: size, height: size, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: size * 4,
+                       space: CGColorSpace(name: CGColorSpace.linearSRGB)!,
+                       bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
+                       provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)!
+    }
+
+    /// Record surface: near-black with faint concentric lines and paler track gaps.
+    static func recordSurface() -> CGImage {
+        draw(1024, 1024) { ctx in
+            var r = RNG(3)
+            ctx.setFillColor(color((0.022, 0.022, 0.026)))
+            ctx.fill(CGRect(x: 0, y: 0, width: 1024, height: 1024))
+            func ring(_ frac: CGFloat, _ width: CGFloat, _ alpha: CGFloat) {
+                let rad = frac * 512
+                ctx.setStrokeColor(color((1, 1, 1), alpha))
+                ctx.setLineWidth(width)
+                ctx.strokeEllipse(in: CGRect(x: 512 - rad, y: 512 - rad, width: rad * 2, height: rad * 2))
+            }
+            var f: CGFloat = 0.37
+            while f < 0.97 { ring(f, 1, r.f(0.0, 0.035)); f += r.f(0.002, 0.006) }
+            for g in [0.455, 0.57, 0.69, 0.80, 0.895] as [CGFloat] { ring(g, 4, 0.06) }
+            ring(0.985, 6, 0.05)
+        }
+    }
+
+    /// The two bright wedges light makes on a grooved record. Drawn on a disc that does not spin.
+    static func recordSheen() -> CGImage {
+        let size = 1024
+        var px = [UInt8](repeating: 255, count: size * size * 4)
+        var r = RNG(17)
+        let noise: [Double] = (0..<512).map { _ in Double(r.f(0.6, 1)) }
+        for y in 0..<size {
