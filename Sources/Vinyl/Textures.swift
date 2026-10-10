@@ -169,3 +169,60 @@ enum Tex {
         var r = RNG(17)
         let noise: [Double] = (0..<512).map { _ in Double(r.f(0.6, 1)) }
         for y in 0..<size {
+            for x in 0..<size {
+                let dx = (Double(x) + 0.5 - 512) / 512, dy = (Double(y) + 0.5 - 512) / 512
+                let rad = (dx * dx + dy * dy).squareRoot()
+                var v = 0.0
+                if rad > 0.36 && rad < 0.975 {
+                    let a = atan2(dy, dx)
+                    v = pow(abs(cos(a - 0.6)), 46) * 0.62 + pow(abs(cos(a - 1.9)), 120) * 0.14
+                    v *= noise[min(511, Int(rad * 511))]
+                    v *= min(1, (rad - 0.36) / 0.04) * min(1, (0.975 - rad) / 0.02)
+                }
+                let i = (y * size + x) * 4
+                let b = UInt8(max(0, min(255, v * 255)))
+                px[i] = b; px[i + 1] = b; px[i + 2] = b
+            }
+        }
+        let provider = CGDataProvider(data: Data(px) as CFData)!
+        return CGImage(width: size, height: size, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: size * 4,
+                       space: srgb, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
+                       provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)!
+    }
+
+    /// Centre label for the record, cut from the album cover.
+    static func label(from art: CGImage) -> CGImage {
+        draw(512, 512) { ctx in
+            let rect = CGRect(x: 0, y: 0, width: 512, height: 512)
+            ctx.setFillColor(color((0.05, 0.05, 0.05)))
+            ctx.fill(rect)
+            ctx.addEllipse(in: rect)
+            ctx.clip()
+            ctx.draw(art, in: rect)
+            ctx.setStrokeColor(color((0, 0, 0), 0.35))
+            ctx.setLineWidth(6)
+            ctx.strokeEllipse(in: rect.insetBy(dx: 3, dy: 3))
+            ctx.setFillColor(color((0.08, 0.08, 0.08)))
+            ctx.fillEllipse(in: CGRect(x: 256 - 22, y: 256 - 22, width: 44, height: 44))
+        }
+    }
+
+    /// Aspect-fill an arbitrary image into a square.
+    static func square(_ image: NSImage, size: Int = 1024) -> CGImage? {
+        var rect = CGRect(origin: .zero, size: image.size)
+        guard let cg = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) else { return nil }
+        return draw(size, size) { ctx in
+            ctx.interpolationQuality = .high
+            let w = CGFloat(cg.width), h = CGFloat(cg.height), S = CGFloat(size)
+            let scale = S / min(w, h)
+            ctx.draw(cg, in: CGRect(x: (S - w * scale) / 2, y: (S - h * scale) / 2, width: w * scale, height: h * scale))
+        }
+    }
+
+    // MARK: Built-in artwork
+
+    static let palettes: [(RGB, RGB, RGB)] = [
+        ((0.86, 0.42, 0.20), (0.96, 0.87, 0.70), (0.13, 0.22, 0.30)),
+        ((0.12, 0.30, 0.33), (0.93, 0.74, 0.42), (0.90, 0.88, 0.80)),
+        ((0.90, 0.85, 0.74), (0.75, 0.25, 0.18), (0.16, 0.15, 0.14)),
+        ((0.20, 0.22, 0.42), (0.95, 0.62, 0.50), (0.96, 0.92, 0.84)),
