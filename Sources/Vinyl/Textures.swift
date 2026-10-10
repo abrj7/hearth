@@ -226,3 +226,34 @@ enum Tex {
         ((0.12, 0.30, 0.33), (0.93, 0.74, 0.42), (0.90, 0.88, 0.80)),
         ((0.90, 0.85, 0.74), (0.75, 0.25, 0.18), (0.16, 0.15, 0.14)),
         ((0.20, 0.22, 0.42), (0.95, 0.62, 0.50), (0.96, 0.92, 0.84)),
+        ((0.55, 0.62, 0.45), (0.96, 0.90, 0.76), (0.25, 0.20, 0.15)),
+        ((0.10, 0.10, 0.11), (0.85, 0.70, 0.35), (0.80, 0.78, 0.74)),
+    ]
+
+    /// A house-style sleeve used before any real album cover arrives (or when a cover can't be found).
+    static func placeholderCover(seed: UInt64) -> CGImage {
+        draw(1024, 1024) { ctx in
+            var r = RNG(seed &+ 99)
+            let p = palettes[Int(seed % UInt64(palettes.count))]
+            let S: CGFloat = 1024
+            ctx.setFillColor(color(p.0))
+            ctx.fill(CGRect(x: 0, y: 0, width: S, height: S))
+            switch seed % 3 {
+            case 0: // rising sun with rings
+                let cx = S * r.f(0.4, 0.6), cy = S * r.f(0.3, 0.45)
+                for i in (0..<6).reversed() {
+                    let rad = S * (0.14 + CGFloat(i) * 0.075)
+                    ctx.setFillColor(color(i % 2 == 0 ? p.1 : p.0, i == 0 ? 1 : 0.9))
+                    ctx.fillEllipse(in: CGRect(x: cx - rad, y: cy - rad, width: rad * 2, height: rad * 2))
+                }
+                ctx.setFillColor(color(p.2))
+                ctx.fill(CGRect(x: 0, y: 0, width: S, height: cy - S * 0.08))
+            case 1: // stacked arcs
+                for i in 0..<7 {
+                    let rad = S * (0.95 - CGFloat(i) * 0.12)
+                    ctx.setFillColor(color(i % 2 == 0 ? p.1 : p.2, 1))
+                    ctx.fillEllipse(in: CGRect(x: S * 0.5 - rad, y: -rad * 0.55, width: rad * 2, height: rad * 2))
+                }
+            default: // offset discs
+                ctx.setFillColor(color(p.2))
+                ctx.fillEllipse(in: CGRect(x: S * 0.14, y: S * 0.2, width: S * 0.6, height: S * 0.6))
