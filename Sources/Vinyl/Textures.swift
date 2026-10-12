@@ -257,3 +257,48 @@ enum Tex {
             default: // offset discs
                 ctx.setFillColor(color(p.2))
                 ctx.fillEllipse(in: CGRect(x: S * 0.14, y: S * 0.2, width: S * 0.6, height: S * 0.6))
+                ctx.setFillColor(color(p.1, 0.92))
+                ctx.fillEllipse(in: CGRect(x: S * 0.32, y: S * 0.14, width: S * 0.6, height: S * 0.6))
+            }
+            // Paper grain.
+            for _ in 0..<9000 {
+                ctx.setFillColor(color((0, 0, 0), r.f(0.01, 0.05)))
+                ctx.fill(CGRect(x: r.f(0, S), y: r.f(0, S), width: 2, height: 2))
+            }
+        }
+    }
+
+    /// Abstract landscape for the frame on the wall.
+    static func painting() -> CGImage {
+        let img = draw(1024, 680) { ctx in
+            var r = RNG(42)
+            let W: CGFloat = 1024, H: CGFloat = 680
+            let grad = CGGradient(colorsSpace: srgb, colors: [
+                color((0.93, 0.62, 0.36)), color((0.95, 0.80, 0.58)), color((0.62, 0.70, 0.72)),
+            ] as CFArray, locations: [0, 0.45, 1])!
+            ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: H * 0.25), end: CGPoint(x: 0, y: H), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+            ctx.setFillColor(color((0.99, 0.93, 0.78)))
+            ctx.fillEllipse(in: CGRect(x: W * 0.58, y: H * 0.42, width: 150, height: 150))
+            let hills: [RGB] = [(0.47, 0.46, 0.50), (0.33, 0.36, 0.38), (0.21, 0.26, 0.25), (0.12, 0.15, 0.14)]
+            for (i, c) in hills.enumerated() {
+                let baseY = H * (0.46 - CGFloat(i) * 0.1)
+                let a1 = r.f(20, 60), a2 = r.f(10, 30), p1 = r.f(0, 6), p2 = r.f(0, 6), f1 = r.f(0.004, 0.009), f2 = r.f(0.012, 0.02)
+                ctx.beginPath()
+                ctx.move(to: CGPoint(x: 0, y: 0))
+                var x: CGFloat = 0
+                while x <= W {
+                    ctx.addLine(to: CGPoint(x: x, y: baseY + a1 * sin(x * f1 + p1) + a2 * sin(x * f2 + p2)))
+                    x += 8
+                }
+                ctx.addLine(to: CGPoint(x: W, y: 0))
+                ctx.closePath()
+                ctx.setFillColor(color(c))
+                ctx.fillPath()
+            }
+        }
+        return blur(img, 1.2)
+    }
+
+    // MARK: Lighting helpers
+
+    /// Equirectangular room: bright ceiling, warm walls, dark floor, one soft window.
