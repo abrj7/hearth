@@ -302,3 +302,41 @@ enum Tex {
     // MARK: Lighting helpers
 
     /// Equirectangular room: bright ceiling, warm walls, dark floor, one soft window.
+    static func environment() -> CGImage {
+        let img = draw(1024, 512) { ctx in
+            let grad = CGGradient(colorsSpace: srgb, colors: [
+                color((0.16, 0.10, 0.06)), color((0.48, 0.40, 0.33)), color((0.80, 0.75, 0.68)), color((0.93, 0.90, 0.85)),
+            ] as CFArray, locations: [0, 0.42, 0.6, 1])!
+            ctx.drawLinearGradient(grad, start: .zero, end: CGPoint(x: 0, y: 512), options: [])
+            ctx.setFillColor(color((1, 1, 1)))
+            ctx.fill(CGRect(x: 120, y: 270, width: 170, height: 150))
+            ctx.fill(CGRect(x: 640, y: 300, width: 90, height: 110))
+        }
+        return blur(img, 14)
+    }
+
+    /// Light shape for the sun: slatted blinds, slightly soft.
+    static func blindsGobo() -> CGImage {
+        let img = draw(1024, 1024) { ctx in
+            ctx.setFillColor(color((0, 0, 0)))
+            ctx.fill(CGRect(x: 0, y: 0, width: 1024, height: 1024))
+            ctx.translateBy(x: 512, y: 512)
+            ctx.rotate(by: -0.42)
+            ctx.setFillColor(color((1, 1, 1)))
+            for pane in 0..<2 {
+                let x0 = CGFloat(pane) * 400 - 390
+                for i in 0..<10 {
+                    ctx.fill(CGRect(x: x0, y: CGFloat(i) * 64 - 320, width: 370, height: 40))
+                }
+            }
+        }
+        return blur(img, 5)
+    }
+
+    /// Vertical ribs for the glass lamp shade.
+    static func ribNormal() -> CGImage {
+        draw(64, 4) { ctx in
+            for x in 0..<64 {
+                let s = sin(Double(x) / 64 * 2 * .pi)
+                ctx.setFillColor(color((CGFloat(0.5 + 0.28 * s), 0.5, 0.95)))
+                ctx.fill(CGRect(x: x, y: 0, width: 1, height: 4))
