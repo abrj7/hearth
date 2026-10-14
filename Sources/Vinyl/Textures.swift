@@ -340,3 +340,42 @@ enum Tex {
                 let s = sin(Double(x) / 64 * 2 * .pi)
                 ctx.setFillColor(color((CGFloat(0.5 + 0.28 * s), 0.5, 0.95)))
                 ctx.fill(CGRect(x: x, y: 0, width: 1, height: 4))
+            }
+        }
+    }
+
+    /// Soft contact shadow used when the room is hidden.
+    static func shadowBlob() -> CGImage {
+        draw(256, 256) { ctx in
+            let grad = CGGradient(colorsSpace: srgb, colors: [color((0, 0, 0), 0.55), color((0, 0, 0), 0.25), color((0, 0, 0), 0)] as CFArray, locations: [0, 0.6, 1])!
+            ctx.drawRadialGradient(grad, startCenter: CGPoint(x: 128, y: 128), startRadius: 0, endCenter: CGPoint(x: 128, y: 128), endRadius: 128, options: [])
+        }
+    }
+
+    /// App icon: a record on a warm tile.
+    static func appIcon() -> CGImage {
+        draw(1024, 1024) { ctx in
+            let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
+            ctx.addPath(CGPath(roundedRect: tile, cornerWidth: 185, cornerHeight: 185, transform: nil))
+            ctx.clip()
+            let bg = CGGradient(colorsSpace: srgb, colors: [color((0.78, 0.40, 0.18)), color((0.93, 0.62, 0.34))] as CFArray, locations: [0, 1])!
+            ctx.drawLinearGradient(bg, start: CGPoint(x: 0, y: 100), end: CGPoint(x: 0, y: 924), options: [])
+            ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 40, color: color((0, 0, 0), 0.45))
+            ctx.setFillColor(color((0.06, 0.06, 0.07)))
+            ctx.fillEllipse(in: CGRect(x: 512 - 320, y: 512 - 320, width: 640, height: 640))
+            ctx.setShadow(offset: .zero, blur: 0, color: nil)
+            for i in 0..<26 {
+                let rad = 130 + CGFloat(i) * 7.2
+                ctx.setStrokeColor(color((1, 1, 1), i % 5 == 0 ? 0.10 : 0.04))
+                ctx.setLineWidth(2)
+                ctx.strokeEllipse(in: CGRect(x: 512 - rad, y: 512 - rad, width: rad * 2, height: rad * 2))
+            }
+            ctx.setFillColor(color((0.96, 0.88, 0.72)))
+            ctx.fillEllipse(in: CGRect(x: 512 - 110, y: 512 - 110, width: 220, height: 220))
+            ctx.setFillColor(color((0.80, 0.33, 0.16)))
+            ctx.fillEllipse(in: CGRect(x: 512 - 70, y: 512 - 70, width: 140, height: 140))
+            ctx.setFillColor(color((0.06, 0.06, 0.07)))
+            ctx.fillEllipse(in: CGRect(x: 512 - 14, y: 512 - 14, width: 28, height: 28))
+        }
+    }
+}
