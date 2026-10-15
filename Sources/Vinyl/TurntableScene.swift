@@ -80,3 +80,39 @@ final class TurntableScene {
         buildLights()
         buildCamera()
         scene.rootNode.addChildNode(stackNode)
+        apply(preset: .daylight, animated: false)
+    }
+
+    // MARK: Materials
+
+    private static func mat(_ contents: Any, rough: CGFloat, metal: CGFloat = 0) -> SCNMaterial {
+        let m = SCNMaterial()
+        m.lightingModel = .physicallyBased
+        m.diffuse.contents = contents
+        m.roughness.contents = NSNumber(value: Double(rough))
+        m.metalness.contents = NSNumber(value: Double(metal))
+        m.diffuse.mipFilter = .linear
+        m.diffuse.maxAnisotropy = 16
+        return m
+    }
+
+    private static func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> NSColor {
+        NSColor(srgbRed: r, green: g, blue: b, alpha: a)
+    }
+
+    private func node(_ geometry: SCNGeometry, _ material: SCNMaterial, at p: SCNVector3 = SCNVector3Zero) -> SCNNode {
+        geometry.materials = [material]
+        let n = SCNNode(geometry: geometry)
+        n.position = p
+        return n
+    }
+
+    // MARK: Build
+
+    private func buildRoom() {
+        // Desk: deep enough that the top-down view never sees an edge.
+        let deskMat = Self.mat(Self.deskWood, rough: 0.42)
+        deskMat.diffuse.wrapS = .repeat
+        deskMat.diffuse.wrapT = .repeat
+        deskMat.diffuse.contentsTransform = SCNMatrix4MakeScale(2.4, 1.9, 1)
+        let desk = node(SCNBox(width: 26, height: 0.6, length: 21, chamferRadius: 0), deskMat, at: SCNVector3(0, -0.3, -2.5))
