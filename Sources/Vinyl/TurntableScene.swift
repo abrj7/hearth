@@ -281,3 +281,44 @@ final class TurntableScene {
         let brass = Self.mat(Self.rgb(0.72, 0.53, 0.26), rough: 0.32, metal: 1)
         lamp.addChildNode(node(SCNCone(topRadius: 0.3, bottomRadius: 0.8, height: 0.45), brass, at: SCNVector3(0, 0.225, 0)))
         lamp.addChildNode(node(SCNCylinder(radius: 0.5, height: 0.14), brass, at: SCNVector3(0, 0.6, 0)))
+        lamp.addChildNode(node(SCNCylinder(radius: 0.09, height: 0.5), brass, at: SCNVector3(0, 0.75, 0)))
+
+        bulbMaterial = Self.mat(Self.rgb(0.95, 0.92, 0.85), rough: 0.4)
+        lamp.addChildNode(node(SCNCapsule(capRadius: 0.24, height: 1.05), bulbMaterial, at: SCNVector3(0, 1.5, 0)))
+
+        shadeMaterial = Self.mat(Self.rgb(0.80, 0.56, 0.28), rough: 0.15)
+        shadeMaterial.normal.contents = Self.ribs
+        shadeMaterial.normal.wrapS = .repeat
+        shadeMaterial.normal.contentsTransform = SCNMatrix4MakeScale(38, 1, 1)
+        shadeMaterial.transparency = 0.5
+        shadeMaterial.writesToDepthBuffer = false
+        let shade = SCNCapsule(capRadius: 1.0, height: 2.9)
+        shade.radialSegmentCount = 96
+        let shadeNode = node(shade, shadeMaterial, at: SCNVector3(0, 2.05, 0))
+        shadeNode.renderingOrder = 10
+        shadeNode.castsShadow = false
+        lamp.addChildNode(shadeNode)
+        room.addChildNode(lamp)
+    }
+
+    private func buildLights() {
+        let s = SCNLight()
+        s.type = .spot
+        s.color = Self.rgb(1, 0.90, 0.74)
+        s.spotInnerAngle = 34
+        s.spotOuterAngle = 40
+        s.castsShadow = true
+        s.shadowMapSize = CGSize(width: 4096, height: 4096)
+        s.shadowSampleCount = 24
+        s.shadowRadius = 5
+        s.shadowColor = NSColor(white: 0, alpha: 0.75)
+        s.shadowBias = 2
+        s.zNear = 4
+        s.zFar = 70
+        s.gobo?.contents = Self.gobo
+        s.gobo?.intensity = 1
+        sun.light = s
+        sun.position = SCNVector3(-17, 13, 15)
+        sun.look(at: SCNVector3(0.6, 1.2, -1.2))
+        scene.rootNode.addChildNode(sun)
+
