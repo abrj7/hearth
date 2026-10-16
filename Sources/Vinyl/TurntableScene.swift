@@ -540,3 +540,51 @@ final class TurntableScene {
         }
         if pushPrevious { pushToStack(previous, animated: animated) }
     }
+
+    func pushToStack(_ art: CGImage, animated: Bool) {
+        stackCounter += 1
+        var r = RNG(stackCounter &* 7919)
+        let item = StackItem(node: makeFlatSleeve(art), dx: r.f(-0.28, 0.28), dz: r.f(-0.22, 0.22), yaw: r.f(-0.24, 0.24))
+        stackNode.addChildNode(item.node)
+        stack.append(item)
+
+        if stack.count > maxStack {
+            let old = stack.removeFirst()
+            old.node.removeFromParentNode()
+        }
+        if animated {
+            // Settle anything that shifted, then drop the new sleeve in from above.
+            let newcomer = stack.removeLast()
+            transact(true, 0.4) { layoutStack() }
+            stack.append(newcomer)
+            let i = stack.count - 1
+            let o = stackOrigin
+            let spread: CGFloat = preset == .topDown ? 1.0 : 0.8
+            let end = SCNVector3(o.x + item.dx * spread, CGFloat(i) * sleeveThickness + sleeveThickness / 2 + 0.005, o.z + item.dz * spread)
+            item.node.position = SCNVector3(end.x - 0.6, end.y + 1.6, end.z + 0.3)
+            item.node.eulerAngles.y = item.yaw - 0.25
+            item.node.opacity = 0
+            let drop = SCNAction.group([
+                .move(to: end, duration: 0.55),
+                .rotateTo(x: 0, y: item.yaw, z: 0, duration: 0.55),
+                .fadeOpacity(to: 1, duration: 0.25),
+            ])
+            drop.timingMode = .easeIn
+            item.node.runAction(drop)
+            if preset == .topDown { transact(true, 0.4) { layoutSleeve() } }
+        } else {
+            layoutStack()
+            layoutSleeve()
+        }
+    }
+
+    /// True if the hit node belongs to the turntable.
+    static func isTurntable(_ node: SCNNode?) -> Bool {
+        var n = node
+        while let cur = n {
+            if cur.name == "turntable" { return true }
+            n = cur.parent
+        }
+        return false
+    }
+}
