@@ -322,3 +322,44 @@ final class TurntableScene {
         sun.look(at: SCNVector3(0.6, 1.2, -1.2))
         scene.rootNode.addChildNode(sun)
 
+        let o = SCNLight()
+        o.type = .omni
+        o.color = Self.rgb(1, 0.60, 0.28)
+        o.intensity = 0
+        o.attenuationStartDistance = 0
+        o.attenuationEndDistance = 30
+        o.attenuationFalloffExponent = 2
+        lampOmni.light = o
+        lampOmni.position = SCNVector3(5.2, 1.9, -1.4)
+        scene.rootNode.addChildNode(lampOmni)
+
+        let ls = SCNLight()
+        ls.type = .spot
+        ls.color = Self.rgb(1, 0.62, 0.30)
+        ls.intensity = 0
+        ls.spotInnerAngle = 60
+        ls.spotOuterAngle = 130
+        ls.castsShadow = true
+        ls.shadowMapSize = CGSize(width: 2048, height: 2048)
+        ls.shadowSampleCount = 24
+        ls.shadowRadius = 8
+        ls.shadowColor = NSColor(white: 0, alpha: 0.7)
+        ls.zNear = 1.2
+        ls.zFar = 40
+        ls.attenuationStartDistance = 0
+        ls.attenuationEndDistance = 30
+        ls.attenuationFalloffExponent = 2
+        lampSpot.light = ls
+        lampSpot.position = SCNVector3(5.2, 2.2, -1.4)
+        lampSpot.look(at: SCNVector3(-3, 0, 1.2))
+        scene.rootNode.addChildNode(lampSpot)
+    }
+
+    private func buildCamera() {
+        let c = SCNCamera()
+        c.projectionDirection = .horizontal
+        c.zNear = 0.5
+        c.zFar = 200
+        c.wantsHDR = true
+        c.wantsExposureAdaptation = false
+        c.bloomThreshold = 0.9
