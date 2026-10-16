@@ -493,3 +493,50 @@ final class TurntableScene {
         room.childNodes.first?.isHidden = on // desk
         blobs.isHidden = on == false || preset == .topDown
         apply(preset: preset, animated: false)
+        blobs.isHidden = !on
+    }
+
+    func setPlaying(_ on: Bool, animated: Bool) {
+        playing = on
+        transact(animated, 1.3) {
+            arm.eulerAngles.y = on ? armPlay : armRest
+            ledMaterial.emission.contents = on ? Self.rgb(1, 0.35, 0.1) : NSColor.black
+            ledMaterial.emission.intensity = on ? 4 : 0
+        }
+        if !animated { velocity = on ? fullSpeed : 0 }
+    }
+
+    /// Advance the platter. Returns true while anything is still moving.
+    @discardableResult
+    func update(at time: TimeInterval) -> Bool {
+        let dt = min(0.1, time - (lastTime ?? time))
+        lastTime = time
+        let target = playing ? fullSpeed : 0
+        velocity += (target - velocity) * min(1, dt * 1.8)
+        if abs(target - velocity) < 0.01 { velocity = target }
+        spin.eulerAngles.y -= CGFloat(velocity * dt)
+        return velocity > 0
+    }
+
+    /// Give the platter a static angle (used for still renders).
+    func setPlatterAngle(_ a: CGFloat) { spin.eulerAngles.y = a }
+
+    /// Swap the cover on the stand and the record label. The outgoing cover lands on the stack.
+    func setArtwork(_ art: CGImage, pushPrevious: Bool, animated: Bool) {
+        let previous = currentArt
+        currentArt = art
+        let swap = { [self] in
+            sleeveBox.geometry?.materials.first?.diffuse.contents = art
+            labelMaterial.diffuse.contents = Tex.label(from: art)
+        }
+        if animated {
+            sleeveHolder.runAction(.sequence([
+                .fadeOpacity(to: 0, duration: 0.3),
+                .run { _ in swap() },
+                .fadeOpacity(to: 1, duration: 0.45),
+            ]))
+        } else {
+            swap()
+        }
+        if pushPrevious { pushToStack(previous, animated: animated) }
+    }
