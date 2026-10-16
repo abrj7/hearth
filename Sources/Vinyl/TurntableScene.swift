@@ -422,3 +422,74 @@ final class TurntableScene {
         }
         // Hidden things should not cast shadows either.
         let hide = p == .topDown
+        DispatchQueue.main.asyncAfter(deadline: .now() + (animated ? 0.7 : 0)) { [weak self] in
+            guard let self, self.preset == p else { return }
+            self.wallGroup.isHidden = hide || self.transparent
+            self.lamp.isHidden = hide || self.transparent
+            self.stand.isHidden = hide
+        }
+        if !animated {
+            wallGroup.isHidden = hide || transparent
+            lamp.isHidden = hide || transparent
+            stand.isHidden = hide
+        } else if !hide {
+            wallGroup.isHidden = transparent
+            lamp.isHidden = transparent
+            stand.isHidden = false
+        }
+    }
+
+    private func applyCameraEffects() {
+        guard let cam = cameraNode.camera else { return }
+        let day = preset != .lamplight
+        cam.wantsHDR = !transparent
+        cam.bloomIntensity = transparent ? 0 : (day ? 0.2 : 0.7)
+        cam.vignettingIntensity = transparent ? 0 : (day ? 0.5 : 0.9)
+        cam.screenSpaceAmbientOcclusionIntensity = transparent ? 0 : 1.1
+        cam.exposureOffset = 0
+        cam.saturation = 1.06
+        cam.contrast = 0.08
+    }
+
+    private var stackHeight: CGFloat { CGFloat(stack.count) * sleeveThickness }
+
+    private func layoutSleeve() {
+        if preset == .topDown {
+            // Lying flat on top of the stack, left of the turntable.
+            sleeveHolder.position = SCNVector3(-4.55, stackHeight + sleeveThickness / 2 + 0.01, 0.75 + sleeveSize / 2)
+            sleeveHolder.eulerAngles.y = 0
+            sleeveTilt.eulerAngles.x = -.pi / 2
+        } else {
+            sleeveHolder.position = SCNVector3(-4.6, 0.13, -0.2)
+            sleeveHolder.eulerAngles.y = 0.1
+            sleeveTilt.eulerAngles.x = -0.16
+        }
+    }
+
+    private var stackOrigin: SCNVector3 {
+        preset == .topDown ? SCNVector3(-4.55, 0, 0.75) : SCNVector3(4.25, 0, 2.3)
+    }
+
+    private func layoutStack() {
+        let o = stackOrigin
+        let spread: CGFloat = preset == .topDown ? 1.0 : 0.8
+        for (i, item) in stack.enumerated() {
+            item.node.position = SCNVector3(o.x + item.dx * spread, CGFloat(i) * sleeveThickness + sleeveThickness / 2 + 0.005, o.z + item.dz * spread)
+            item.node.eulerAngles.y = item.yaw
+            item.node.opacity = 1
+        }
+    }
+
+    // MARK: Public controls
+
+    func setSize(_ factor: CGFloat, animated: Bool) {
+        sizeFactor = factor
+        apply(preset: preset, animated: animated)
+    }
+
+    func setTransparent(_ on: Bool) {
+        transparent = on
+        scene.background.contents = on ? NSColor.clear : NSColor.black
+        room.childNodes.first?.isHidden = on // desk
+        blobs.isHidden = on == false || preset == .topDown
+        apply(preset: preset, animated: false)
