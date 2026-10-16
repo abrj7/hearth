@@ -363,3 +363,62 @@ final class TurntableScene {
         c.wantsHDR = true
         c.wantsExposureAdaptation = false
         c.bloomThreshold = 0.9
+        c.bloomBlurRadius = 18
+        c.vignettingPower = 1.2
+        c.screenSpaceAmbientOcclusionRadius = 0.7
+        c.screenSpaceAmbientOcclusionBias = 0.03
+        cameraNode.camera = c
+        scene.rootNode.addChildNode(cameraNode)
+    }
+
+    // MARK: Presets
+
+    private func transact(_ animated: Bool, _ duration: CFTimeInterval = 1.4, _ body: () -> Void) {
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = animated ? duration : 0
+        SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        body()
+        SCNTransaction.commit()
+    }
+
+    func apply(preset p: Preset, animated: Bool) {
+        preset = p
+        transact(animated) {
+            let cam = cameraNode.camera!
+            let probe = SCNNode()
+            let day = p != .lamplight
+
+            if p == .topDown {
+                probe.position = SCNVector3(-2.05, 24, 0.75)
+                probe.look(at: SCNVector3(-2.05, 0, 0.75), up: SCNVector3(0, 0, -1), localFront: SCNVector3(0, 0, -1))
+                cam.fieldOfView = 31 * sizeFactor
+            } else {
+                probe.position = SCNVector3(0, 5.4, 14.5)
+                probe.look(at: SCNVector3(0, 1.75, 0))
+                cam.fieldOfView = 53 * sizeFactor
+            }
+            cameraNode.position = probe.position
+            cameraNode.orientation = probe.orientation
+
+            // Lighting.
+            scene.lightingEnvironment.intensity = day ? 1.15 : 0.2
+            sun.light?.intensity = day ? 2600 : 0
+            lampOmni.light?.intensity = day ? 0 : 150
+            lampSpot.light?.intensity = day ? 0 : 420
+            frameGlow.light?.intensity = day ? 0 : 60
+            shadeMaterial.emission.contents = day ? NSColor.black : Self.rgb(1, 0.50, 0.16)
+            shadeMaterial.emission.intensity = day ? 0 : 0.9
+            bulbMaterial.emission.contents = day ? NSColor.black : Self.rgb(1, 0.85, 0.6)
+            bulbMaterial.emission.intensity = day ? 0 : 6
+            sheenMaterial.multiply.contents = day ? Self.rgb(0.75, 0.72, 0.66) : Self.rgb(0.5, 0.27, 0.1)
+            applyCameraEffects()
+
+            // Layout.
+            wallGroup.opacity = p == .topDown ? 0 : 1
+            lamp.opacity = p == .topDown ? 0 : 1
+            stand.opacity = p == .topDown ? 0 : 1
+            layoutSleeve()
+            layoutStack()
+        }
+        // Hidden things should not cast shadows either.
+        let hide = p == .topDown
