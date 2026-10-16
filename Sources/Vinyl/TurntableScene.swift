@@ -234,3 +234,50 @@ final class TurntableScene {
         turntable.addChildNode(node(SCNCylinder(radius: 0.05, height: 0.36), dark, at: SCNVector3(pivot.x, top + 0.18, 0.75)))
 
         // Brass knob + power LED.
+        let brass = Self.mat(Self.rgb(0.78, 0.60, 0.30), rough: 0.3, metal: 1)
+        turntable.addChildNode(node(SCNCylinder(radius: 0.1, height: 0.1), brass, at: SCNVector3(1.82, top + 0.05, 1.38)))
+        ledMaterial = Self.mat(Self.rgb(0.1, 0.03, 0.02), rough: 0.4)
+        ledMaterial.emission.contents = NSColor.black
+        turntable.addChildNode(node(SCNCylinder(radius: 0.028, height: 0.012), ledMaterial, at: SCNVector3(1.42, top + 0.006, 1.42)))
+
+        scene.rootNode.addChildNode(turntable)
+    }
+
+    /// A record sleeve: thin box with the cover on its +Z face, centred on its own origin.
+    private func makeSleeve(_ art: CGImage) -> SCNNode {
+        let box = SCNBox(width: sleeveSize, height: sleeveSize, length: sleeveThickness, chamferRadius: 0)
+        let front = Self.mat(art, rough: 0.55)
+        let paper = Self.mat(Self.rgb(0.90, 0.88, 0.83), rough: 0.8)
+        box.materials = [front, paper, paper, paper, paper, paper]
+        return SCNNode(geometry: box)
+    }
+
+    /// A flat sleeve, face up, whose origin is its centre.
+    private func makeFlatSleeve(_ art: CGImage) -> SCNNode {
+        let holder = SCNNode()
+        let s = makeSleeve(art)
+        s.eulerAngles.x = -.pi / 2
+        holder.addChildNode(s)
+        return holder
+    }
+
+    private func buildSleeve() {
+        sleeveBox = makeSleeve(currentArt)
+        sleeveBox.position = SCNVector3(0, sleeveSize / 2, 0)
+        sleeveTilt.addChildNode(sleeveBox)
+        sleeveHolder.addChildNode(sleeveTilt)
+        scene.rootNode.addChildNode(sleeveHolder)
+
+        let oak = Self.mat(Self.oak, rough: 0.5)
+        stand.position = SCNVector3(-4.6, 0, -0.25)
+        stand.eulerAngles.y = 0.1
+        stand.addChildNode(node(SCNBox(width: 3.6, height: 0.13, length: 0.75, chamferRadius: 0.025), oak, at: SCNVector3(0, 0.065, 0)))
+        stand.addChildNode(node(SCNBox(width: 3.6, height: 0.12, length: 0.1, chamferRadius: 0.02), oak, at: SCNVector3(0, 0.18, 0.2)))
+        scene.rootNode.addChildNode(stand)
+    }
+
+    private func buildLamp() {
+        lamp.position = SCNVector3(5.2, 0, -1.4)
+        let brass = Self.mat(Self.rgb(0.72, 0.53, 0.26), rough: 0.32, metal: 1)
+        lamp.addChildNode(node(SCNCone(topRadius: 0.3, bottomRadius: 0.8, height: 0.45), brass, at: SCNVector3(0, 0.225, 0)))
+        lamp.addChildNode(node(SCNCylinder(radius: 0.5, height: 0.14), brass, at: SCNVector3(0, 0.6, 0)))
