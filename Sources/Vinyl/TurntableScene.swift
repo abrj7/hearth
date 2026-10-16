@@ -175,3 +175,62 @@ final class TurntableScene {
         turntable.addChildNode(node(SCNBox(width: 4.5, height: 0.1, length: 3.6, chamferRadius: 0.035), cream, at: SCNVector3(0, 0.53, 0)))
         let top: CGFloat = 0.58
 
+        // Platter + record + label spin together.
+        spin.position = SCNVector3(-0.45, top, 0.05)
+        let alu = Self.mat(Self.rgb(0.78, 0.78, 0.79), rough: 0.28, metal: 1)
+        let platter = SCNCylinder(radius: 1.57, height: 0.2)
+        platter.radialSegmentCount = 120
+        spin.addChildNode(node(platter, alu, at: SCNVector3(0, 0.1, 0)))
+        let lip = SCNCylinder(radius: 1.6, height: 0.05)
+        lip.radialSegmentCount = 120
+        spin.addChildNode(node(lip, alu, at: SCNVector3(0, 0.03, 0)))
+
+        let vinyl = Self.mat(Self.recordSurface, rough: 0.3)
+        vinyl.normal.contents = Self.grooves
+        vinyl.normal.mipFilter = .linear
+        vinyl.normal.maxAnisotropy = 16
+        vinyl.normal.intensity = 1
+        let record = SCNCylinder(radius: 1.5, height: 0.025)
+        record.radialSegmentCount = 160
+        spin.addChildNode(node(record, vinyl, at: SCNVector3(0, 0.2125, 0)))
+
+        labelMaterial = Self.mat(Tex.label(from: currentArt), rough: 0.6)
+        let label = SCNCylinder(radius: 0.5, height: 0.028)
+        label.radialSegmentCount = 72
+        spin.addChildNode(node(label, labelMaterial, at: SCNVector3(0, 0.2125, 0)))
+        spin.addChildNode(node(SCNCylinder(radius: 0.035, height: 0.14), alu, at: SCNVector3(0, 0.27, 0)))
+        turntable.addChildNode(spin)
+
+        // Groove sheen sits just above the record and stays put while it spins.
+        sheenMaterial.lightingModel = .constant
+        sheenMaterial.diffuse.contents = Self.sheen
+        sheenMaterial.blendMode = .add
+        sheenMaterial.writesToDepthBuffer = false
+        let sheenDisc = SCNCylinder(radius: 1.5, height: 0.002)
+        sheenDisc.radialSegmentCount = 96
+        let sheenNode = node(sheenDisc, sheenMaterial, at: SCNVector3(-0.45, top + 0.228, 0.05))
+        sheenNode.castsShadow = false
+        turntable.addChildNode(sheenNode)
+
+        // Tonearm.
+        let dark = Self.mat(Self.rgb(0.07, 0.07, 0.075), rough: 0.35, metal: 1)
+        let pivot = SCNVector3(1.6, top, -1.15)
+        turntable.addChildNode(node(SCNCylinder(radius: 0.2, height: 0.06), dark, at: SCNVector3(pivot.x, top + 0.03, pivot.z)))
+        turntable.addChildNode(node(SCNCylinder(radius: 0.13, height: 0.44), dark, at: SCNVector3(pivot.x, top + 0.22, pivot.z)))
+        arm.position = SCNVector3(pivot.x, top + 0.43, pivot.z)
+        let tube = node(SCNCylinder(radius: 0.032, height: 2.6), alu, at: SCNVector3(0, 0, 0.95))
+        tube.eulerAngles.x = .pi / 2
+        arm.addChildNode(tube)
+        let weight = node(SCNCylinder(radius: 0.14, height: 0.34), alu, at: SCNVector3(0, 0, -0.42))
+        weight.eulerAngles.x = .pi / 2
+        arm.addChildNode(weight)
+        arm.addChildNode(node(SCNBox(width: 0.17, height: 0.035, length: 0.46, chamferRadius: 0.01), dark, at: SCNVector3(0, -0.02, 2.3)))
+        arm.addChildNode(node(SCNBox(width: 0.14, height: 0.13, length: 0.24, chamferRadius: 0.01), dark, at: SCNVector3(0, -0.1, 2.34)))
+        let lift = node(SCNCylinder(radius: 0.02, height: 0.3), alu, at: SCNVector3(0.2, 0, 2.3))
+        lift.eulerAngles.z = .pi / 2
+        arm.addChildNode(lift)
+        turntable.addChildNode(arm)
+        // Arm rest.
+        turntable.addChildNode(node(SCNCylinder(radius: 0.05, height: 0.36), dark, at: SCNVector3(pivot.x, top + 0.18, 0.75)))
+
+        // Brass knob + power LED.
