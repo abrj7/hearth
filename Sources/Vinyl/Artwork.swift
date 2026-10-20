@@ -50,3 +50,46 @@ enum Artwork {
     }
 
     private static func spotifyScriptCover() async -> NSImage? {
+        let urlString: String? = await withCheckedContinuation { cont in
+            Script.queue.async {
+                guard Player.spotify.isRunning else { return cont.resume(returning: nil) }
+                cont.resume(returning: Script.run("tell application \"Spotify\" to return artwork url of current track")?.stringValue)
+            }
+        }
+        guard let urlString, urlString.hasPrefix("http") else { return nil }
+        return await image(urlString)
+    }
+
+    private static func itunesCover(_ track: Track) async -> NSImage? {
+        func search(_ term: String, entity: String) async -> [[String: Any]] {
+            var c = URLComponents(string: "https://itunes.apple.com/search")!
+            c.queryItems = [.init(name: "term", value: term), .init(name: "media", value: "music"),
+                            .init(name: "entity", value: entity), .init(name: "limit", value: "8")]
+            guard let url = c.url, let d = await data(url),
+                  let json = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [] }
+            return json["results"] as? [[String: Any]] ?? []
+        }
+        func norm(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
+
+        var results: [[String: Any]] = []
+        if !track.album.isEmpty { results = await search("\(track.artist) \(track.album)", entity: "album") }
+        var pick = results.first { norm($0["collectionName"] as? String ?? "") == norm(track.album) } ?? results.first
+        if pick == nil {
+            results = await search("\(track.artist) \(track.title)", entity: "song")
+            pick = results.first { norm($0["trackName"] as? String ?? "") == norm(track.title) } ?? results.first
+        }
+        guard let small = pick?["artworkUrl100"] as? String else { return nil }
+        return await image(small.replacingOccurrences(of: "100x100bb", with: "1000x1000bb"))
+    }
+
+    private static func musicLibraryCover() async -> NSImage? {
+        await withCheckedContinuation { cont in
+            Script.queue.async {
+                guard Player.music.isRunning,
+                      let d = Script.run("tell application \"Music\" to return raw data of artwork 1 of current track")?.data
+                else { return cont.resume(returning: nil) }
+                cont.resume(returning: NSImage(data: d))
+            }
+        }
+    }
+}
