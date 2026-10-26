@@ -95,3 +95,41 @@ final class DesktopController: NSObject, SCNSceneRendererDelegate {
     }
 
     // MARK: Rendering
+
+    /// Render continuously for a while; the delegate stops the loop once everything is still.
+    func kick(_ seconds: CFTimeInterval = 4) {
+        keepAliveUntil = max(keepAliveUntil, CACurrentMediaTime() + seconds)
+        view.isPlaying = true
+    }
+
+    func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+        let now = CACurrentMediaTime()
+        let moving = scene.update(at: now)
+        if !moving && now > keepAliveUntil {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, CACurrentMediaTime() > self.keepAliveUntil, !self.state.isPlaying else { return }
+                self.view.isPlaying = false
+            }
+        }
+    }
+
+    /// Debug aid: `kill -USR1 <pid>` writes what the desktop currently shows to the caches folder.
+    func writeLiveSnapshot() {
+        let image = view.snapshot()
+        var rect = CGRect(origin: .zero, size: image.size)
+        guard let cg = image.cgImage(forProposedRect: &rect, context: nil, hints: nil),
+              let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.appendingPathComponent("com.abrj7.vinyl") else { return }
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        writePNG(cg, to: dir.appendingPathComponent("live.png").path)
+        let t = state.track
+        try? "\(state.isPlaying ? "playing" : "paused") | \(t?.title ?? "-") | \(t?.artist ?? "-") | \(t?.player.displayName ?? "-")\n"
+            .write(to: dir.appendingPathComponent("state.txt"), atomically: true, encoding: .utf8)
+    }
+
+    // MARK: State changes
+
+    func setPlaying(_ playing: Bool) {
+        scene.setPlaying(playing, animated: true)
+        kick(playing ? 4 : 8)
+    }
+
