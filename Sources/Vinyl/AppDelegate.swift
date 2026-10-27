@@ -62,3 +62,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.state.artwork = NSImage(cgImage: cover, size: NSSize(width: 512, height: 512))
             self.desktop.setArtwork(cover)
             self.refreshThumbnails()
+        }
+    }
+
+    /// Re-render the three scene previews with the current cover (off the main thread).
+    private func refreshThumbnails() {
+        thumbnailWork?.cancel()
+        let art = desktop.scene.currentArt
+        let work = DispatchWorkItem { [weak self] in
+            let stack = (1...3).map { Tex.placeholderCover(seed: UInt64($0)) }
+            let images = TurntableScene.Preset.allCases.map {
+                renderStill(preset: $0, size: CGSize(width: 480, height: 300), art: art, stack: stack, playing: true)
+            }
+            DispatchQueue.main.async { self?.state.thumbnails = images }
+        }
+        thumbnailWork = work
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.8, execute: work)
+    }
+
+    // MARK: Menu
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        if let t = state.track {
+            let title = NSMenuItem(title: t.title, action: nil, keyEquivalent: "")
+            title.isEnabled = false
+            menu.addItem(title)
+            let sub = NSMenuItem(title: "\(t.artist) · \(t.player.displayName)", action: nil, keyEquivalent: "")
+            sub.isEnabled = false
+            menu.addItem(sub)
+            menu.addItem(item(state.isPlaying ? "Pause" : "Play", #selector(togglePlayback)))
+        } else {
+            let idle = NSMenuItem(title: "Play something in Spotify or Apple Music", action: nil, keyEquivalent: "")
+            idle.isEnabled = false
+            menu.addItem(idle)
+        }
+        menu.addItem(.separator())
+        for p in TurntableScene.Preset.allCases {
+            let i = item(p.title, #selector(pickScene(_:)))
+            i.tag = p.rawValue
+            i.state = state.preset == p ? .on : .off
+            menu.addItem(i)
+        }
+        menu.addItem(.separator())
+        menu.addItem(item("Settings…", #selector(showSettings), key: ","))
+        menu.addItem(item("Quit Vinyl", #selector(quit), key: "q"))
+    }
+
+    private func item(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
+        let i = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        i.target = self
+        return i
+    }
+
+    @objc private func togglePlayback() { monitor.togglePlayPause() }
+    @objc private func pickScene(_ sender: NSMenuItem) {
+        if let p = TurntableScene.Preset(rawValue: sender.tag) { state.preset = p }
+    }
+    @objc private func quit() { NSApp.terminate(nil) }
+
+    @objc func showSettings() {
+        if settingsWindow == nil {
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 560),
+                             styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
+                             backing: .buffered, defer: false)
+            w.titlebarAppearsTransparent = true
+            w.titleVisibility = .hidden
+            w.isMovableByWindowBackground = true
+            w.isReleasedWhenClosed = false
+            w.appearance = NSAppearance(named: .darkAqua)
+            w.backgroundColor = NSColor(srgbRed: 0.075, green: 0.07, blue: 0.068, alpha: 1)
+            w.contentViewController = NSHostingController(rootView: SettingsView(state: state, togglePlayback: { [weak self] in
+                self?.monitor.togglePlayPause()
+            }))
+            w.center()
+            settingsWindow = w
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+}
