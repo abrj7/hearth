@@ -133,3 +133,62 @@ final class DesktopController: NSObject, SCNSceneRendererDelegate {
         kick(playing ? 4 : 8)
     }
 
+    func setArtwork(_ art: CGImage) {
+        scene.setArtwork(art, pushPrevious: true, animated: true)
+        kick(4)
+    }
+
+    func applySettings() {
+        if state.transparent != appliedTransparent { applyTransparency(state.transparent) }
+        if state.sizeIndex != appliedSize {
+            appliedSize = state.sizeIndex
+            scene.setSize(AppState.sizeFactors[state.sizeIndex], animated: true)
+        }
+        if state.preset != appliedPreset {
+            appliedPreset = state.preset
+            scene.apply(preset: state.preset, animated: true)
+        }
+        kick(4)
+    }
+
+    private func applyTransparency(_ on: Bool) {
+        appliedTransparent = on
+        scene.setTransparent(on)
+        window.isOpaque = !on
+        window.backgroundColor = on ? .clear : .black
+        view.backgroundColor = on ? .clear : .black
+    }
+
+    // MARK: Clicks
+
+    private func handleGlobalMouse(_ event: NSEvent) {
+        let p = NSEvent.mouseLocation
+        if event.type == .leftMouseDown {
+            mouseDownAt = p
+            return
+        }
+        guard let down = mouseDownAt, hypot(p.x - down.x, p.y - down.y) < 5 else { return }
+        mouseDownAt = nil
+        guard window.frame.contains(p), isDesktopExposed(at: p) else { return }
+        let local = view.convert(window.convertPoint(fromScreen: p), from: nil)
+        let hits = view.hitTest(local, options: [.searchMode: SCNHitTestSearchMode.closest.rawValue])
+        if TurntableScene.isTurntable(hits.first?.node) { onTurntableClick?() }
+    }
+
+    /// True when no ordinary window covers this screen point, i.e. the click landed on the desktop.
+    private func isDesktopExposed(at p: NSPoint) -> Bool {
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(p) }), screen.visibleFrame.contains(p),
+              let primary = NSScreen.screens.first else { return false }
+        let cgPoint = CGPoint(x: p.x, y: primary.frame.height - p.y)
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else { return true }
+        for info in list {
+            guard let layer = info[kCGWindowLayer as String] as? Int, (0...8).contains(layer),
+                  (info[kCGWindowAlpha as String] as? Double ?? 1) > 0.01,
+                  let boundsDict = info[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: boundsDict) else { continue }
+            if bounds.contains(cgPoint) { return false }
+        }
+        return true
+    }
+}
