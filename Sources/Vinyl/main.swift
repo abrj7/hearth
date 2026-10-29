@@ -34,3 +34,17 @@ if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
     }
     let stack = (1...4).map { Tex.placeholderCover(seed: UInt64($0)) }
     for p in TurntableScene.Preset.allCases {
+        let img = renderStill(preset: p, size: CGSize(width: 1512, height: 982), art: art, stack: stack, playing: p != .lamplight)
+        var rect = CGRect(origin: .zero, size: img.size)
+        if let cg = img.cgImage(forProposedRect: &rect, context: nil, hints: nil) {
+            writePNG(cg, to: "\(args[i + 1])/\(p.title.replacingOccurrences(of: " ", with: "")).png")
+        }
+    }
+    exit(0)
+}
+
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.setActivationPolicy(.accessory)
+app.run()
