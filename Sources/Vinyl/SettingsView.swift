@@ -67,3 +67,73 @@ struct SettingsView: View {
                 }
             }
             .frame(width: 60, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(state.track?.title ?? "Nothing playing").font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                Text(state.track?.artist ?? "Play a track in Spotify or Apple Music").font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(1)
+                if let t = state.track {
+                    Text(t.player.displayName).font(.system(size: 11)).foregroundStyle(.tertiary)
+                }
+            }
+            Spacer()
+            if state.track != nil {
+                Button(action: togglePlayback) {
+                    Image(systemName: state.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 15))
+                        .frame(width: 38, height: 38)
+                        .background(Color.white.opacity(0.08), in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .background(card, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func sceneCard(_ p: TurntableScene.Preset) -> some View {
+        let selected = state.preset == p
+        return Button {
+            state.preset = p
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                Group {
+                    if state.thumbnails.indices.contains(p.rawValue) {
+                        Image(nsImage: state.thumbnails[p.rawValue]).resizable().aspectRatio(contentMode: .fill)
+                    } else {
+                        Color.white.opacity(0.05)
+                    }
+                }
+                .frame(height: 112)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                HStack {
+                    Text(p.title).font(.system(size: 13, weight: .medium))
+                    Spacer()
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(selected ? accent : Color.white.opacity(0.25))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+            }
+            .background(Color.white.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? accent.opacity(0.9) : hairline, lineWidth: selected ? 1.5 : 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func row<Control: View>(_ icon: String, _ title: String, _ subtitle: String?, @ViewBuilder control: () -> Control) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon).font(.system(size: 13)).foregroundStyle(.secondary).frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 13, weight: .medium))
+                if let subtitle { Text(subtitle).font(.system(size: 11)).foregroundStyle(.tertiary) }
+            }
+            Spacer()
+            control()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+    }
+}
