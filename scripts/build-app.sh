@@ -43,3 +43,14 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+
+codesign --force --sign - "$APP" >/dev/null 2>&1
+echo "Built $APP"
+
+if [[ "${1:-}" == "--install" ]]; then
+  pkill -x Vinyl 2>/dev/null && sleep 1 || true
+  rm -rf /Applications/Vinyl.app
+  cp -R "$APP" /Applications/Vinyl.app
+  open /Applications/Vinyl.app
+  echo "Installed to /Applications/Vinyl.app"
+fi
