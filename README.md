@@ -42,3 +42,14 @@ swift build -c release && .build/release/Vinyl --snapshot /tmp --art some-cover.
 While the app runs, `kill -USR1 $(pgrep -x Vinyl)` writes what the desktop currently shows
 to `~/Library/Caches/com.abrj7.vinyl/live.png`.
 
+## Layout
+
+| File | What it holds |
+| --- | --- |
+| `Textures.swift` | Procedural textures and built-in artwork |
+| `TurntableScene.swift` | The 3D scene, scene presets, spin and stack animation |
+| `NowPlaying.swift` | Spotify / Apple Music playback monitor |
+| `Artwork.swift` | Album cover lookup |
+| `DesktopController.swift` | Wallpaper-level window, click handling, settings state |
+| `AppDelegate.swift` | Menu bar item and wiring |
+| `SettingsView.swift` | Settings window |
