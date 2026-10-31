@@ -9,3 +9,36 @@ Personal project. Everything on screen is rendered live with SceneKit and every 
 
 ## What it does
 
+- Three scenes: **Daylight**, **Lamplight** and **Top Down**
+- Click the turntable on the desktop to play or pause
+- The tonearm swings onto the record and the platter spins up at 33⅓ rpm
+- Album covers come from Spotify and Apple Music, no login
+- Each new song drops the previous cover onto the stack
+- Transparent mode puts the turntable on your own wallpaper
+- Menu bar icon for scenes, play/pause, settings and quit
+- Stops rendering completely when nothing is playing
+
+## Build and install
+
+Needs Xcode command line tools (Swift 5.9+) and macOS 14 or later.
+
+```bash
+./scripts/build-app.sh --install
+```
+
+That builds `dist/Vinyl.app`, copies it to `/Applications` and launches it.
+
+The first time it talks to Spotify or Music, macOS asks whether Vinyl may control that app.
+Say yes: it is used to read the current track at launch and to play/pause on click.
+
+## Development
+
+Render a still of each scene without launching the app:
+
+```bash
+swift build -c release && .build/release/Vinyl --snapshot /tmp --art some-cover.png
+```
+
+While the app runs, `kill -USR1 $(pgrep -x Vinyl)` writes what the desktop currently shows
+to `~/Library/Caches/com.abrj7.vinyl/live.png`.
+
