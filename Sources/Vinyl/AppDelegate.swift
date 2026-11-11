@@ -64,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         guard let track, track.key != currentKey else { return }
         currentKey = track.key
+        desktop.setTrack(title: track.title, artist: track.artist)
         Artwork.fetch(for: track) { [weak self] image in
             guard let self, self.currentKey == track.key else { return }
             NSLog("Vinyl: cover %@ for %@", image == nil ? "not found" : "loaded", track.album)

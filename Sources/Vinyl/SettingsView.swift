@@ -32,6 +32,10 @@ struct SettingsView: View {
                     Toggle("", isOn: $state.autoScene).labelsHidden().toggleStyle(.switch).tint(accent)
                 }
                 Divider().overlay(hairline)
+                row("textformat", "Show song title", "A small card on the desk names the track and artist") {
+                    Toggle("", isOn: $state.showTitle).labelsHidden().toggleStyle(.switch).tint(accent)
+                }
+                Divider().overlay(hairline)
                 row("rectangle.on.rectangle", "Transparent background", "Sit the turntable on your own wallpaper") {
                     Toggle("", isOn: $state.transparent).labelsHidden().toggleStyle(.switch).tint(accent)
                 }

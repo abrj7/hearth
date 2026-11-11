@@ -366,6 +366,44 @@ enum Tex {
         }
     }
 
+    /// Small printed card naming the song, like a label beside a record in a shop.
+    static func titleCard(title: String, artist: String) -> CGImage {
+        draw(1024, 400) { ctx in
+            var r = RNG(8)
+            ctx.setFillColor(color((0.93, 0.90, 0.83)))
+            ctx.fill(CGRect(x: 0, y: 0, width: 1024, height: 400))
+            for _ in 0..<5000 {
+                ctx.setFillColor(color((0.3, 0.2, 0.1), r.f(0.01, 0.05)))
+                ctx.fill(CGRect(x: r.f(0, 1024), y: r.f(0, 400), width: 2, height: 2))
+            }
+            ctx.setStrokeColor(color((0.25, 0.18, 0.12), 0.55))
+            ctx.setLineWidth(3)
+            ctx.stroke(CGRect(x: 26, y: 26, width: 972, height: 348))
+
+            let ink = NSColor(srgbRed: 0.15, green: 0.11, blue: 0.08, alpha: 1)
+            let para = NSMutableParagraphStyle()
+            para.alignment = .center
+            para.lineBreakMode = .byTruncatingTail
+            func serif(_ size: CGFloat, _ weight: NSFont.Weight) -> NSFont {
+                let base = NSFont.systemFont(ofSize: size, weight: weight)
+                return base.fontDescriptor.withDesign(.serif).flatMap { NSFont(descriptor: $0, size: size) } ?? base
+            }
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+            NSAttributedString(string: "NOW PLAYING", attributes: [
+                .font: NSFont.systemFont(ofSize: 30, weight: .semibold), .kern: 9,
+                .foregroundColor: NSColor(srgbRed: 0.62, green: 0.33, blue: 0.14, alpha: 1), .paragraphStyle: para,
+            ]).draw(in: CGRect(x: 60, y: 290, width: 904, height: 44))
+            // Shrink long titles a little before truncating them.
+            let size: CGFloat = title.count > 26 ? 66 : 84
+            NSAttributedString(string: title, attributes: [.font: serif(size, .semibold), .foregroundColor: ink, .paragraphStyle: para])
+                .draw(in: CGRect(x: 60, y: 150, width: 904, height: size * 1.3))
+            NSAttributedString(string: artist, attributes: [.font: serif(46, .regular), .foregroundColor: ink.withAlphaComponent(0.7), .paragraphStyle: para])
+                .draw(in: CGRect(x: 60, y: 62, width: 904, height: 62))
+            NSGraphicsContext.restoreGraphicsState()
+        }
+    }
+
     /// Soft contact shadow used when the room is hidden.
     static func shadowBlob() -> CGImage {
         draw(256, 256) { ctx in

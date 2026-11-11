@@ -11,6 +11,7 @@ func renderStill(preset: TurntableScene.Preset, size: CGSize, art: CGImage?, sta
     let s = TurntableScene(art: art)
     for a in stack { s.pushToStack(a, animated: false) }
     s.apply(preset: preset, animated: false)
+    s.setTitle("Side One", artist: "Your music here", animated: false)
     s.setPlaying(playing, animated: false)
     s.setPlatterAngle(0.6)
     let renderer = SCNRenderer(device: MTLCreateSystemDefaultDevice(), options: nil)

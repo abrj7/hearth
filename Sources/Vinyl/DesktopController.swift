@@ -27,6 +27,7 @@ final class AppState: ObservableObject {
     }
     /// Follow the clock: Daylight from 6:30 to 18:30, Lamplight otherwise.
     @Published var autoScene: Bool { didSet { defaults.set(autoScene, forKey: "autoScene"); syncSceneToClock() } }
+    @Published var showTitle: Bool { didSet { defaults.set(showTitle, forKey: "showTitle"); onChange?() } }
     var onChange: (() -> Void)?
     private var clock: Timer?
 
@@ -53,6 +54,7 @@ final class AppState: ObservableObject {
         sizeIndex = defaults.object(forKey: "size") as? Int ?? 1
         transparent = defaults.bool(forKey: "transparent")
         launchAtLogin = SMAppService.mainApp.status == .enabled
+        showTitle = defaults.object(forKey: "showTitle") as? Bool ?? true
         autoScene = defaults.object(forKey: "autoScene") as? Bool ?? true
         if autoScene { preset = Self.sceneForNow() }
         clock = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.syncSceneToClock() }
@@ -103,6 +105,7 @@ final class DesktopController: NSObject, SCNSceneRendererDelegate {
         scene.setSize(AppState.sizeFactors[state.sizeIndex], animated: false)
         scene.apply(preset: state.preset, animated: false)
         applyTransparency(state.transparent)
+        scene.setTitleCardEnabled(state.showTitle)
         window.orderFrontRegardless()
         kick(3)
 
@@ -162,7 +165,13 @@ final class DesktopController: NSObject, SCNSceneRendererDelegate {
         kick(4)
     }
 
+    func setTrack(title: String?, artist: String?) {
+        scene.setTitle(title, artist: artist, animated: true)
+        kick(3)
+    }
+
     func applySettings() {
+        scene.setTitleCardEnabled(state.showTitle)
         if state.transparent != appliedTransparent { applyTransparency(state.transparent) }
         if state.sizeIndex != appliedSize {
             appliedSize = state.sizeIndex

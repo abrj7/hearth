@@ -16,6 +16,7 @@ Personal project. Everything on screen is rendered live with SceneKit and every 
 - Three scenes: **Daylight**, **Lamplight** and **Top Down**
 - Follows the clock: Daylight from 6:30 am, Lamplight after 6:30 pm (can be turned off)
 - Click the tonearm (or the brass knob) on the desktop to play or pause
+- A small printed card on the desk names the song and artist (can be turned off)
 - Two brass buttons on the deck skip to the previous or next song
 - The tonearm swings onto the record and the platter spins up at 33⅓ rpm
 - Album covers come from Spotify and Apple Music, no login

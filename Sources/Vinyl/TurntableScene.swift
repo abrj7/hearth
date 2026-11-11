@@ -56,6 +56,14 @@ final class TurntableScene {
     /// Things on the turntable that react to a click.
     enum Control: String { case playPause = "ctl.playpause", next = "ctl.next", previous = "ctl.prev" }
     private var buttons: [Control: SCNNode] = [:]
+
+    // Now-playing card.
+    private let cardHolder = SCNNode()
+    private let cardTilt = SCNNode()
+    private var cardMaterial = SCNMaterial()
+    private var cardEnabled = true
+    private var cardHasText = false
+    private let cardSize = CGSize(width: 2.3, height: 0.9)
     private var knobNode = SCNNode()
 
     private struct StackItem { let node: SCNNode; let dx: CGFloat; let dz: CGFloat; let yaw: CGFloat }
@@ -296,6 +304,50 @@ final class TurntableScene {
         stand.addChildNode(node(SCNBox(width: 3.6, height: 0.13, length: 0.75, chamferRadius: 0.025), oak, at: SCNVector3(0, 0.065, 0)))
         stand.addChildNode(node(SCNBox(width: 3.6, height: 0.12, length: 0.1, chamferRadius: 0.02), oak, at: SCNVector3(0, 0.18, 0.2)))
         scene.rootNode.addChildNode(stand)
+
+        // Title card: a small printed card propped up in front of the stand.
+        cardMaterial = Self.mat(Self.rgb(0.93, 0.90, 0.83), rough: 0.7)
+        let paper = Self.mat(Self.rgb(0.90, 0.88, 0.83), rough: 0.8)
+        let box = SCNBox(width: cardSize.width, height: cardSize.height, length: 0.025, chamferRadius: 0)
+        box.materials = [cardMaterial, paper, paper, paper, paper, paper]
+        let card = SCNNode(geometry: box)
+        card.position = SCNVector3(0, cardSize.height / 2, 0)
+        cardTilt.addChildNode(card)
+        cardHolder.addChildNode(cardTilt)
+        cardHolder.opacity = 0
+        cardHolder.isHidden = true
+        scene.rootNode.addChildNode(cardHolder)
+    }
+
+    /// Print a new title on the card (or clear it when nothing is loaded).
+    func setTitle(_ title: String?, artist: String?, animated: Bool) {
+        cardHasText = !(title ?? "").isEmpty
+        let image = cardHasText ? Tex.titleCard(title: title ?? "", artist: artist ?? "") : nil
+        let show = cardHasText && cardEnabled
+        let swap = { [self] in
+            if let image {
+                cardMaterial.diffuse.contents = image
+                cardMaterial.emission.contents = image
+            }
+            cardHolder.isHidden = !show
+        }
+        guard animated else {
+            swap()
+            cardHolder.opacity = show ? 1 : 0
+            return
+        }
+        cardHolder.runAction(.sequence([
+            .fadeOpacity(to: 0, duration: 0.25),
+            .run { _ in swap() },
+            .fadeOpacity(to: show ? 1 : 0, duration: 0.4),
+        ]))
+    }
+
+    func setTitleCardEnabled(_ on: Bool) {
+        cardEnabled = on
+        let show = cardHasText && on
+        cardHolder.isHidden = !show
+        cardHolder.opacity = show ? 1 : 0
     }
 
     private func buildLamp() {
@@ -433,6 +485,7 @@ final class TurntableScene {
             bulbMaterial.emission.contents = day ? NSColor.black : Self.rgb(1, 0.85, 0.6)
             bulbMaterial.emission.intensity = day ? 0 : 6
             sheenMaterial.emission.intensity = day ? 0.55 : 0.22
+            cardMaterial.emission.intensity = day ? 0 : 0.12 // keeps the print readable by lamplight
             applyCameraEffects()
 
             // Layout.
@@ -481,10 +534,17 @@ final class TurntableScene {
             sleeveHolder.position = SCNVector3(-4.55, stackHeight + sleeveThickness / 2 + 0.01, 0.75 + sleeveSize / 2)
             sleeveHolder.eulerAngles.y = 0
             sleeveTilt.eulerAngles.x = -.pi / 2
+            // Card lies flat below the stack.
+            cardHolder.position = SCNVector3(-4.55, 0.02, 3.8)
+            cardHolder.eulerAngles.y = -0.04
+            cardTilt.eulerAngles.x = -.pi / 2
         } else {
             sleeveHolder.position = SCNVector3(-4.6, 0.13, -0.2)
             sleeveHolder.eulerAngles.y = 0.1
             sleeveTilt.eulerAngles.x = -0.16
+            cardHolder.position = SCNVector3(-4.45, 0, 0.85)
+            cardHolder.eulerAngles.y = 0.16
+            cardTilt.eulerAngles.x = -0.5
         }
     }
 
