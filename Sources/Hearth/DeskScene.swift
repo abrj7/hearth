@@ -1,9 +1,10 @@
 import AppKit
 import SceneKit
 
-/// The whole desk: room, turntable, sleeve, record stack, lamp and lights.
+/// The whole room: desk, wall and window, plus whichever items are switched on
+/// (record player, played records, lamp, clock, candle, calendar).
 /// Units are decimetres (a 12" record has radius 1.5).
-final class TurntableScene {
+final class DeskScene {
     enum Preset: Int, CaseIterable, Identifiable {
         case daylight, lamplight, topDown
         var id: Int { rawValue }
@@ -66,6 +67,18 @@ final class TurntableScene {
     private let cardSize = CGSize(width: 2.3, height: 0.9)
     private var knobNode = SCNNode()
 
+    // Optional items.
+    private(set) var items: Set<DeskItem> = DeskItem.defaults
+    private(set) var weather: Weather = .clear
+    private static let wallColor = rgb(0.85, 0.81, 0.74)
+    private static let windowCenter = SCNVector3(-0.4, 4.6, -3.2)
+    private lazy var clock = ClockItem(wood: Self.mat(Self.walnut, rough: 0.45))
+    private let candle = CandleItem()
+    private let calendar = CalendarItem()
+    private lazy var window = WindowItem(wallColor: Self.wallColor)
+    private let windowPlug = SCNNode()
+    private var skyKey = ""
+
     private struct StackItem { let node: SCNNode; let dx: CGFloat; let dz: CGFloat; let yaw: CGFloat }
     private var stack: [StackItem] = []
     private var stackCounter: UInt64 = 0
@@ -93,12 +106,14 @@ final class TurntableScene {
         buildLights()
         buildCamera()
         scene.rootNode.addChildNode(stackNode)
+        scene.rootNode.addChildNode(clock.node)
+        scene.rootNode.addChildNode(candle.node)
         apply(preset: .daylight, animated: false)
     }
 
     // MARK: Materials
 
-    private static func mat(_ contents: Any, rough: CGFloat, metal: CGFloat = 0) -> SCNMaterial {
+    static func mat(_ contents: Any, rough: CGFloat, metal: CGFloat = 0) -> SCNMaterial {
         let m = SCNMaterial()
         m.lightingModel = .physicallyBased
         m.diffuse.contents = contents
@@ -109,7 +124,7 @@ final class TurntableScene {
         return m
     }
 
-    private static func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> NSColor {
+    static func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> NSColor {
         NSColor(srgbRed: r, green: g, blue: b, alpha: a)
     }
 
@@ -131,13 +146,29 @@ final class TurntableScene {
         let desk = node(SCNBox(width: 26, height: 0.6, length: 21, chamferRadius: 0), deskMat, at: SCNVector3(0, -0.3, -2.5))
         room.addChildNode(desk)
 
-        let wallMat = Self.mat(Self.rgb(0.85, 0.81, 0.74), rough: 0.95)
-        let wall = node(SCNPlane(width: 44, height: 26), wallMat, at: SCNVector3(0, 13, -3.2))
-        wallGroup.addChildNode(wall)
+        // The wall is four panels around the window opening, plus a plug for when the window is off.
+        let wallMat = Self.mat(Self.wallColor, rough: 0.95)
+        let wc = Self.windowCenter, ww = WindowItem.size.width, wh = WindowItem.size.height
+        let x0 = wc.x - ww / 2, x1 = wc.x + ww / 2, y0 = wc.y - wh / 2, y1 = wc.y + wh / 2
+        func panel(_ left: CGFloat, _ right: CGFloat, _ bottom: CGFloat, _ top: CGFloat) -> SCNNode {
+            node(SCNPlane(width: right - left, height: top - bottom), wallMat, at: SCNVector3((left + right) / 2, (bottom + top) / 2, wc.z))
+        }
+        wallGroup.addChildNode(panel(-22, x0, 0, 26))
+        wallGroup.addChildNode(panel(x1, 22, 0, 26))
+        wallGroup.addChildNode(panel(x0, x1, 0, y0))
+        wallGroup.addChildNode(panel(x0, x1, y1, 26))
+        windowPlug.addChildNode(panel(x0, x1, y0, y1))
+        wallGroup.addChildNode(windowPlug)
+        window.node.position = wc
+        wallGroup.addChildNode(window.node)
 
-        // Framed painting.
+        calendar.node.position = SCNVector3(-5.3, 4.7, -3.2)
+        wallGroup.addChildNode(calendar.node)
+
+        // Framed painting, to the right of the window.
         let frame = SCNNode()
-        frame.position = SCNVector3(1.3, 4.75, -3.2)
+        frame.position = SCNVector3(4.9, 5.0, -3.2)
+        frame.scale = SCNVector3(0.72, 0.72, 1)
         let frameMat = Self.mat(Self.walnut, rough: 0.5)
         frame.addChildNode(node(SCNBox(width: 4.7, height: 3.5, length: 0.16, chamferRadius: 0.02), frameMat, at: SCNVector3(0, 0, 0.08)))
         frame.addChildNode(node(SCNPlane(width: 4.4, height: 3.2), Self.mat(Self.rgb(0.93, 0.91, 0.86), rough: 0.9), at: SCNVector3(0, 0, 0.165)))
@@ -153,7 +184,7 @@ final class TurntableScene {
         glow.attenuationEndDistance = 5
         glow.attenuationFalloffExponent = 2
         frameGlow.light = glow
-        frameGlow.position = SCNVector3(1.3, 4.75, -3.05)
+        frameGlow.position = SCNVector3(4.9, 5.0, -3.05)
         wallGroup.addChildNode(frameGlow)
 
         room.addChildNode(wallGroup)
@@ -323,7 +354,7 @@ final class TurntableScene {
     func setTitle(_ title: String?, artist: String?, animated: Bool) {
         cardHasText = !(title ?? "").isEmpty
         let image = cardHasText ? Tex.titleCard(title: title ?? "", artist: artist ?? "") : nil
-        let show = cardHasText && cardEnabled
+        let show = cardHasText && cardEnabled && items.contains(.turntable)
         let swap = { [self] in
             if let image {
                 cardMaterial.diffuse.contents = image
@@ -345,13 +376,13 @@ final class TurntableScene {
 
     func setTitleCardEnabled(_ on: Bool) {
         cardEnabled = on
-        let show = cardHasText && on
+        let show = cardHasText && on && items.contains(.turntable)
         cardHolder.isHidden = !show
         cardHolder.opacity = show ? 1 : 0
     }
 
     private func buildLamp() {
-        lamp.position = SCNVector3(5.2, 0, -1.4)
+        lamp.position = SCNVector3(5.9, 0, -1.7)
         let brass = Self.mat(Self.rgb(0.72, 0.53, 0.26), rough: 0.32, metal: 1)
         lamp.addChildNode(node(SCNCone(topRadius: 0.3, bottomRadius: 0.8, height: 0.45), brass, at: SCNVector3(0, 0.225, 0)))
         lamp.addChildNode(node(SCNCylinder(radius: 0.5, height: 0.14), brass, at: SCNVector3(0, 0.6, 0)))
@@ -404,7 +435,7 @@ final class TurntableScene {
         o.attenuationEndDistance = 30
         o.attenuationFalloffExponent = 2
         lampOmni.light = o
-        lampOmni.position = SCNVector3(5.2, 1.9, -1.4)
+        lampOmni.position = SCNVector3(5.9, 1.9, -1.7)
         scene.rootNode.addChildNode(lampOmni)
 
         let ls = SCNLight()
@@ -424,7 +455,7 @@ final class TurntableScene {
         ls.attenuationEndDistance = 30
         ls.attenuationFalloffExponent = 2
         lampSpot.light = ls
-        lampSpot.position = SCNVector3(5.2, 2.2, -1.4)
+        lampSpot.position = SCNVector3(5.9, 2.2, -1.7)
         lampSpot.look(at: SCNVector3(-3, 0, 1.2))
         scene.rootNode.addChildNode(lampSpot)
     }
@@ -468,24 +499,13 @@ final class TurntableScene {
                 cam.fieldOfView = 31 * sizeFactor
             } else {
                 probe.position = SCNVector3(0, 5.4, 14.5)
-                probe.look(at: SCNVector3(0, 1.75, 0))
-                cam.fieldOfView = 53 * sizeFactor
+                probe.look(at: SCNVector3(0, 2.0, 0))
+                cam.fieldOfView = 56 * sizeFactor
             }
             cameraNode.position = probe.position
             cameraNode.orientation = probe.orientation
 
-            // Lighting.
-            scene.lightingEnvironment.intensity = day ? 1.15 : 0.2
-            sun.light?.intensity = day ? 2600 : 0
-            lampOmni.light?.intensity = day ? 0 : 150
-            lampSpot.light?.intensity = day ? 0 : 420
-            frameGlow.light?.intensity = day ? 0 : 60
-            shadeMaterial.emission.contents = day ? NSColor.black : Self.rgb(1, 0.50, 0.16)
-            shadeMaterial.emission.intensity = day ? 0 : 0.9
-            bulbMaterial.emission.contents = day ? NSColor.black : Self.rgb(1, 0.85, 0.6)
-            bulbMaterial.emission.intensity = day ? 0 : 6
-            sheenMaterial.emission.intensity = day ? 0.55 : 0.22
-            cardMaterial.emission.intensity = day ? 0 : 0.12 // keeps the print readable by lamplight
+            applyLighting()
             applyCameraEffects()
 
             // Layout.
@@ -494,24 +514,105 @@ final class TurntableScene {
             stand.opacity = p == .topDown ? 0 : 1
             layoutSleeve()
             layoutStack()
+            layoutItems()
         }
-        // Hidden things should not cast shadows either.
-        let hide = p == .topDown
-        DispatchQueue.main.asyncAfter(deadline: .now() + (animated ? 0.7 : 0)) { [weak self] in
-            guard let self, self.preset == p else { return }
-            self.wallGroup.isHidden = hide || self.transparent
-            self.lamp.isHidden = hide || self.transparent
-            self.stand.isHidden = hide
+        // Hidden things should not cast shadows either; when leaving for the top-down view,
+        // wait for the fade before switching them off.
+        if animated && p == .topDown {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+                guard let self, self.preset == p else { return }
+                self.refreshVisibility()
+            }
+        } else {
+            refreshVisibility()
         }
-        if !animated {
-            wallGroup.isHidden = hide || transparent
-            lamp.isHidden = hide || transparent
-            stand.isHidden = hide
-        } else if !hide {
-            wallGroup.isHidden = transparent
-            lamp.isHidden = transparent
-            stand.isHidden = false
+    }
+
+    /// Light the room for the current scene, weather and set of items.
+    private func applyLighting() {
+        let day = preset != .lamplight
+        let hasLamp = items.contains(.lamp), hasCandle = items.contains(.candle), hasWindow = items.contains(.window)
+        let sunFactor = hasWindow ? weather.sunFactor : 1
+        let lampOn = !day && hasLamp
+
+        scene.lightingEnvironment.intensity = day ? 0.72 + 0.43 * sunFactor : (hasLamp ? 0.2 : (hasCandle ? 0.17 : 0.3))
+        sun.light?.intensity = day ? 2600 * sunFactor : 0
+        lampOmni.light?.intensity = lampOn ? 150 : 0
+        lampSpot.light?.intensity = lampOn ? 420 : 0
+        frameGlow.light?.intensity = day ? 0 : 60
+        shadeMaterial.emission.contents = lampOn ? Self.rgb(1, 0.50, 0.16) : NSColor.black
+        shadeMaterial.emission.intensity = lampOn ? 0.9 : 0
+        bulbMaterial.emission.contents = lampOn ? Self.rgb(1, 0.85, 0.6) : NSColor.black
+        bulbMaterial.emission.intensity = lampOn ? 6 : 0
+        sheenMaterial.emission.intensity = day ? 0.2 + 0.35 * sunFactor : 0.22
+        cardMaterial.emission.intensity = day ? 0 : 0.12 // keeps the print readable by lamplight
+        candle.setLight(day ? 0 : (hasLamp ? 45 : 120))
+        clock.setNight(!day)
+
+        let key = "\(weather.rawValue)-\(day)"
+        if key != skyKey {
+            skyKey = key
+            window.set(weather: weather, night: !day)
         }
+    }
+
+    /// Show only the items that are switched on and that make sense in the current view.
+    private func refreshVisibility() {
+        let top = preset == .topDown
+        let deck = items.contains(.turntable)
+        turntable.isHidden = !deck
+        sleeveHolder.isHidden = !deck
+        stand.isHidden = !deck || top
+        cardHolder.isHidden = !(deck && cardHasText && cardEnabled)
+        stackNode.isHidden = !items.contains(.stack)
+        lamp.isHidden = !items.contains(.lamp) || top || transparent
+        wallGroup.isHidden = top || transparent
+        clock.node.isHidden = !items.contains(.clock) || top
+        candle.node.isHidden = !items.contains(.candle)
+        calendar.node.isHidden = !items.contains(.calendar)
+        window.node.isHidden = !items.contains(.window)
+        windowPlug.isHidden = items.contains(.window)
+    }
+
+    /// Where the clock and candle sit. With no record player the clock takes centre stage.
+    private func layoutItems() {
+        if items.contains(.turntable) {
+            clock.node.position = SCNVector3(3.65, 0, -1.6)
+            clock.node.eulerAngles.y = -0.14
+            clock.node.scale = SCNVector3(1, 1, 1)
+        } else {
+            clock.node.position = SCNVector3(0, 0, 0.4)
+            clock.node.eulerAngles.y = 0
+            clock.node.scale = SCNVector3(1.7, 1.7, 1.7)
+        }
+        candle.node.position = preset == .topDown ? SCNVector3(3.3, 0, 2.3) : SCNVector3(4.9, 0, -0.1)
+    }
+
+    func setItems(_ new: Set<DeskItem>, animated: Bool) {
+        items = new
+        transact(animated, 0.6) {
+            applyLighting()
+            layoutItems()
+        }
+        refreshVisibility()
+    }
+
+    func setWeather(_ w: Weather, animated: Bool) {
+        guard w != weather else { return }
+        weather = w
+        transact(animated, 2.5) { applyLighting() }
+    }
+
+    /// Called every few seconds: keeps the clock and calendar current. True if something was redrawn.
+    func tick(_ date: Date = Date()) -> Bool {
+        let a = clock.refresh(date), b = calendar.refresh(date)
+        return a || b
+    }
+
+    /// True while something in the room moves by itself (flame, rain, snow).
+    var hasAmbientMotion: Bool {
+        if items.contains(.candle) { return true }
+        return items.contains(.window) && weather.isPrecipitating && preset != .topDown && !transparent
     }
 
     private func applyCameraEffects() {
@@ -549,7 +650,7 @@ final class TurntableScene {
     }
 
     private var stackOrigin: SCNVector3 {
-        preset == .topDown ? SCNVector3(-4.55, 0, 0.75) : SCNVector3(4.25, 0, 2.3)
+        preset == .topDown ? SCNVector3(-4.55, 0, 0.75) : SCNVector3(4.1, 0, 2.05)
     }
 
     private func layoutStack() {
@@ -573,9 +674,8 @@ final class TurntableScene {
         transparent = on
         scene.background.contents = on ? NSColor.clear : NSColor.black
         room.childNodes.first?.isHidden = on // desk
-        blobs.isHidden = on == false || preset == .topDown
         apply(preset: preset, animated: false)
-        blobs.isHidden = !on
+        blobs.isHidden = !on || !items.contains(.turntable)
     }
 
     func setPlaying(_ on: Bool, animated: Bool) {
@@ -609,7 +709,8 @@ final class TurntableScene {
         velocity += (target - velocity) * min(1, dt * 1.8)
         if abs(target - velocity) < 0.01 { velocity = target }
         spin.eulerAngles.y -= CGFloat(velocity * dt)
-        return velocity > 0
+        if items.contains(.candle) { candle.flicker(at: time) }
+        return velocity > 0 || hasAmbientMotion
     }
 
     /// Give the platter a static angle (used for still renders).
