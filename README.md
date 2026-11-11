@@ -7,9 +7,14 @@ covers of everything I've played beside it.
 Personal project. Everything on screen is rendered live with SceneKit and every texture
 (wood, grooves, lamp glass, placeholder sleeves) is drawn in code, so there are no image assets.
 
+| Daylight | Lamplight | Top Down |
+| --- | --- | --- |
+| ![Daylight](docs/daylight.png) | ![Lamplight](docs/lamplight.png) | ![Top Down](docs/top-down.png) |
+
 ## What it does
 
 - Three scenes: **Daylight**, **Lamplight** and **Top Down**
+- Follows the clock: Daylight from 6:30 am, Lamplight after 6:30 pm (can be turned off)
 - Click the turntable on the desktop to play or pause
 - The tonearm swings onto the record and the platter spins up at 33⅓ rpm
 - Album covers come from Spotify and Apple Music, no login

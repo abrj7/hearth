@@ -25,13 +25,37 @@ final class AppState: ObservableObject {
             }
         }
     }
+    /// Follow the clock: Daylight from 6:30 to 18:30, Lamplight otherwise.
+    @Published var autoScene: Bool { didSet { defaults.set(autoScene, forKey: "autoScene"); syncSceneToClock() } }
     var onChange: (() -> Void)?
+    private var clock: Timer?
+
+    /// A scene the user chose by hand; this switches the automatic mode off.
+    func pick(_ p: TurntableScene.Preset) {
+        if autoScene { autoScene = false }
+        preset = p
+    }
+
+    static func sceneForNow(_ date: Date = Date()) -> TurntableScene.Preset {
+        let c = Calendar.current.dateComponents([.hour, .minute], from: date)
+        let minutes = (c.hour ?? 12) * 60 + (c.minute ?? 0)
+        return (390..<1110).contains(minutes) ? .daylight : .lamplight
+    }
+
+    func syncSceneToClock() {
+        guard autoScene else { return }
+        let wanted = Self.sceneForNow()
+        if preset != wanted { preset = wanted }
+    }
 
     init() {
         preset = TurntableScene.Preset(rawValue: defaults.integer(forKey: "preset")) ?? .daylight
         sizeIndex = defaults.object(forKey: "size") as? Int ?? 1
         transparent = defaults.bool(forKey: "transparent")
         launchAtLogin = SMAppService.mainApp.status == .enabled
+        autoScene = defaults.object(forKey: "autoScene") as? Bool ?? true
+        if autoScene { preset = Self.sceneForNow() }
+        clock = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.syncSceneToClock() }
     }
 }
 

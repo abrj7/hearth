@@ -28,6 +28,10 @@ struct SettingsView: View {
             .background(card, in: RoundedRectangle(cornerRadius: 14))
 
             VStack(spacing: 0) {
+                row("sun.horizon", "Match time of day", "Daylight from 6:30 am, Lamplight after 6:30 pm") {
+                    Toggle("", isOn: $state.autoScene).labelsHidden().toggleStyle(.switch).tint(accent)
+                }
+                Divider().overlay(hairline)
                 row("rectangle.on.rectangle", "Transparent background", "Sit the turntable on your own wallpaper") {
                     Toggle("", isOn: $state.transparent).labelsHidden().toggleStyle(.switch).tint(accent)
                 }
@@ -94,7 +98,7 @@ struct SettingsView: View {
     private func sceneCard(_ p: TurntableScene.Preset) -> some View {
         let selected = state.preset == p
         return Button {
-            state.preset = p
+            state.pick(p)
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 Group {

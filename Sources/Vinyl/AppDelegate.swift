@@ -31,6 +31,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         monitor.onChange = { [weak self] track, playing in self?.playbackChanged(track, playing) }
         monitor.start()
+        // Re-check the clock after sleep, so the scene is right the moment the Mac wakes.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.state.syncSceneToClock()
+        }
         refreshThumbnails()
 
         if !UserDefaults.standard.bool(forKey: "launchedBefore") {
@@ -104,6 +108,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             i.state = state.preset == p ? .on : .off
             menu.addItem(i)
         }
+        let auto = item("Match Time of Day", #selector(toggleAuto))
+        auto.state = state.autoScene ? .on : .off
+        menu.addItem(auto)
         menu.addItem(.separator())
         menu.addItem(item("Settings…", #selector(showSettings), key: ","))
         menu.addItem(item("Quit Vinyl", #selector(quit), key: "q"))
@@ -117,7 +124,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func togglePlayback() { monitor.togglePlayPause() }
     @objc private func pickScene(_ sender: NSMenuItem) {
-        if let p = TurntableScene.Preset(rawValue: sender.tag) { state.preset = p }
+        if let p = TurntableScene.Preset(rawValue: sender.tag) { state.pick(p) }
+    }
+    @objc private func toggleAuto() { state.autoScene.toggle()
     }
     @objc private func quit() { NSApp.terminate(nil) }
 
