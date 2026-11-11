@@ -49,7 +49,7 @@ struct SettingsView: View {
             }
             .background(card, in: RoundedRectangle(cornerRadius: 14))
 
-            Text("Click the turntable on your desktop to play or pause.")
+            Text("On your desktop: click the tonearm to play or pause, and the brass buttons to skip.")
                 .font(.system(size: 12)).foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 24)

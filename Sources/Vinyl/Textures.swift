@@ -344,6 +344,28 @@ enum Tex {
         }
     }
 
+    /// Brass button cap with an engraved skip glyph (two triangles and a bar).
+    static func buttonCap(forward: Bool) -> CGImage {
+        draw(128, 128) { ctx in
+            ctx.setFillColor(color((0.78, 0.60, 0.30)))
+            ctx.fill(CGRect(x: 0, y: 0, width: 128, height: 128))
+            if !forward {
+                ctx.translateBy(x: 128, y: 0)
+                ctx.scaleBy(x: -1, y: 1)
+            }
+            ctx.setFillColor(color((0.16, 0.10, 0.04)))
+            for x0 in [36, 60] as [CGFloat] {
+                ctx.beginPath()
+                ctx.move(to: CGPoint(x: x0, y: 44))
+                ctx.addLine(to: CGPoint(x: x0 + 24, y: 64))
+                ctx.addLine(to: CGPoint(x: x0, y: 84))
+                ctx.closePath()
+                ctx.fillPath()
+            }
+            ctx.fill(CGRect(x: 86, y: 44, width: 7, height: 40))
+        }
+    }
+
     /// Soft contact shadow used when the room is hidden.
     static func shadowBlob() -> CGImage {
         draw(256, 256) { ctx in

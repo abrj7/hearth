@@ -104,9 +104,13 @@ final class NowPlayingMonitor {
         }
     }
 
-    func togglePlayPause() {
+    func togglePlayPause() { send("playpause") }
+
+    func skip(forward: Bool) { send(forward ? "next track" : "previous track") }
+
+    private func send(_ command: String) {
         let target = active ?? [Player.spotify, .music].first { $0.isRunning }
         guard let player = target, player.isRunning else { return }
-        Script.queue.async { _ = Script.run("tell application \"\(player.appName)\" to playpause") }
+        Script.queue.async { _ = Script.run("tell application \"\(player.appName)\" to \(command)") }
     }
 }

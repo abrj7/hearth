@@ -70,7 +70,7 @@ final class DesktopController: NSObject, SCNSceneRendererDelegate {
     private var appliedPreset: TurntableScene.Preset
     private var appliedSize: Int
     private var appliedTransparent = false
-    var onTurntableClick: (() -> Void)?
+    var onControl: ((TurntableScene.Control) -> Void)?
 
     init(state: AppState) {
         self.state = state
@@ -195,8 +195,32 @@ final class DesktopController: NSObject, SCNSceneRendererDelegate {
         mouseDownAt = nil
         guard window.frame.contains(p), isDesktopExposed(at: p) else { return }
         let local = view.convert(window.convertPoint(fromScreen: p), from: nil)
-        let hits = view.hitTest(local, options: [.searchMode: SCNHitTestSearchMode.closest.rawValue])
-        if TurntableScene.isTurntable(hits.first?.node) { onTurntableClick?() }
+        // Only the tonearm, the knob and the two skip buttons react; the rest of the deck is inert.
+        guard let control = control(at: local) else { return }
+        if control != .playPause { scene.press(control) }
+        kick(3)
+        onControl?(control)
+    }
+
+    /// Which control, if any, is under this point of the view.
+    private func control(at point: CGPoint) -> TurntableScene.Control? {
+        func screen(_ v: SCNVector3) -> CGPoint {
+            let p = view.projectPoint(v)
+            return CGPoint(x: p.x, y: p.y)
+        }
+        let targets = scene.clickTargets
+        // Slack scales with how big the deck is drawn: about a tenth of a record's width.
+        let slack = max(14, hypot(screen(targets.arm.0).x - screen(targets.arm.1).x, screen(targets.arm.0).y - screen(targets.arm.1).y) * 0.09)
+        for (control, world) in targets.points {
+            let c = screen(world)
+            if hypot(point.x - c.x, point.y - c.y) < slack { return control }
+        }
+        let a = screen(targets.arm.0), b = screen(targets.arm.1)
+        let ab = CGPoint(x: b.x - a.x, y: b.y - a.y)
+        let len2 = max(1, ab.x * ab.x + ab.y * ab.y)
+        let t = max(0, min(1, ((point.x - a.x) * ab.x + (point.y - a.y) * ab.y) / len2))
+        let nearest = CGPoint(x: a.x + ab.x * t, y: a.y + ab.y * t)
+        return hypot(point.x - nearest.x, point.y - nearest.y) < slack ? .playPause : nil
     }
 
     /// True when no ordinary window covers this screen point, i.e. the click landed on the desktop.

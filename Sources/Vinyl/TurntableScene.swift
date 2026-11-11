@@ -53,6 +53,11 @@ final class TurntableScene {
     private var bulbMaterial = SCNMaterial()
     private var sheenMaterial = SCNMaterial()
 
+    /// Things on the turntable that react to a click.
+    enum Control: String { case playPause = "ctl.playpause", next = "ctl.next", previous = "ctl.prev" }
+    private var buttons: [Control: SCNNode] = [:]
+    private var knobNode = SCNNode()
+
     private struct StackItem { let node: SCNNode; let dx: CGFloat; let dz: CGFloat; let yaw: CGFloat }
     private var stack: [StackItem] = []
     private var stackCounter: UInt64 = 0
@@ -192,7 +197,11 @@ final class TurntableScene {
         vinyl.normal.intensity = 1
         let record = SCNCylinder(radius: 1.5, height: 0.025)
         record.radialSegmentCount = 160
-        spin.addChildNode(node(record, vinyl, at: SCNVector3(0, 0.2125, 0)))
+        // The record is radially symmetric, so it stays still while the label and platter spin.
+        // That lets the light wedges across the grooves live in its own material and stay put.
+        vinyl.emission.contents = Self.sheen
+        sheenMaterial = vinyl
+        turntable.addChildNode(node(record, vinyl, at: SCNVector3(-0.45, top + 0.2125, 0.05)))
 
         labelMaterial = Self.mat(Tex.label(from: currentArt), rough: 0.6)
         let label = SCNCylinder(radius: 0.5, height: 0.028)
@@ -201,16 +210,6 @@ final class TurntableScene {
         spin.addChildNode(node(SCNCylinder(radius: 0.035, height: 0.14), alu, at: SCNVector3(0, 0.27, 0)))
         turntable.addChildNode(spin)
 
-        // Groove sheen sits just above the record and stays put while it spins.
-        sheenMaterial.lightingModel = .constant
-        sheenMaterial.diffuse.contents = Self.sheen
-        sheenMaterial.blendMode = .add
-        sheenMaterial.writesToDepthBuffer = false
-        let sheenDisc = SCNCylinder(radius: 1.5, height: 0.002)
-        sheenDisc.radialSegmentCount = 96
-        let sheenNode = node(sheenDisc, sheenMaterial, at: SCNVector3(-0.45, top + 0.228, 0.05))
-        sheenNode.castsShadow = false
-        turntable.addChildNode(sheenNode)
 
         // Tonearm.
         let dark = Self.mat(Self.rgb(0.07, 0.07, 0.075), rough: 0.35, metal: 1)
@@ -235,10 +234,33 @@ final class TurntableScene {
 
         // Brass knob + power LED.
         let brass = Self.mat(Self.rgb(0.78, 0.60, 0.30), rough: 0.3, metal: 1)
-        turntable.addChildNode(node(SCNCylinder(radius: 0.1, height: 0.1), brass, at: SCNVector3(1.82, top + 0.05, 1.38)))
+        let knob = node(SCNCylinder(radius: 0.1, height: 0.1), brass, at: SCNVector3(1.82, top + 0.05, 1.38))
+        knob.name = Control.playPause.rawValue
+        turntable.addChildNode(knob)
         ledMaterial = Self.mat(Self.rgb(0.1, 0.03, 0.02), rough: 0.4)
         ledMaterial.emission.contents = NSColor.black
         turntable.addChildNode(node(SCNCylinder(radius: 0.028, height: 0.012), ledMaterial, at: SCNVector3(1.42, top + 0.006, 1.42)))
+
+        // Previous / next: two brass push buttons in the front-left corner of the top plate.
+        for (control, x) in [(Control.previous, -2.0), (Control.next, -1.62)] as [(Control, CGFloat)] {
+            let holder = SCNNode()
+            holder.name = control.rawValue
+            holder.position = SCNVector3(x, top, 1.5)
+            holder.addChildNode(node(SCNCylinder(radius: 0.165, height: 0.012), dark))
+            let cap = Self.mat(Tex.buttonCap(forward: control == .next), rough: 0.32, metal: 1)
+            let button = SCNCylinder(radius: 0.14, height: 0.07)
+            button.radialSegmentCount = 48
+            button.materials = [brass, cap, brass]
+            let buttonNode = SCNNode(geometry: button)
+            buttonNode.position = SCNVector3(0, 0.035, 0)
+            buttonNode.eulerAngles.y = -.pi / 2
+            buttonNode.name = "cap"
+            holder.addChildNode(buttonNode)
+            turntable.addChildNode(holder)
+            buttons[control] = buttonNode
+        }
+
+        knobNode = knob
 
         scene.rootNode.addChildNode(turntable)
     }
@@ -410,7 +432,7 @@ final class TurntableScene {
             shadeMaterial.emission.intensity = day ? 0 : 0.9
             bulbMaterial.emission.contents = day ? NSColor.black : Self.rgb(1, 0.85, 0.6)
             bulbMaterial.emission.intensity = day ? 0 : 6
-            sheenMaterial.multiply.contents = day ? Self.rgb(0.75, 0.72, 0.66) : Self.rgb(0.5, 0.27, 0.1)
+            sheenMaterial.emission.intensity = day ? 0.55 : 0.22
             applyCameraEffects()
 
             // Layout.
@@ -498,8 +520,20 @@ final class TurntableScene {
 
     func setPlaying(_ on: Bool, animated: Bool) {
         playing = on
+        let target = on ? armPlay : armRest
+        arm.removeAllActions()
+        if animated {
+            // Lift the needle, swing across, set it down.
+            let from = arm.eulerAngles.y
+            arm.runAction(.sequence([
+                .rotateTo(x: -0.07, y: from, z: 0, duration: 0.25, usesShortestUnitArc: true),
+                .rotateTo(x: -0.07, y: target, z: 0, duration: 0.85, usesShortestUnitArc: true),
+                .rotateTo(x: 0, y: target, z: 0, duration: 0.3, usesShortestUnitArc: true),
+            ]))
+        } else {
+            arm.eulerAngles = SCNVector3(0, target, 0)
+        }
         transact(animated, 1.3) {
-            arm.eulerAngles.y = on ? armPlay : armRest
             ledMaterial.emission.contents = on ? Self.rgb(1, 0.35, 0.1) : NSColor.black
             ledMaterial.emission.intensity = on ? 4 : 0
         }
@@ -578,13 +612,19 @@ final class TurntableScene {
         }
     }
 
-    /// True if the hit node belongs to the turntable.
-    static func isTurntable(_ node: SCNNode?) -> Bool {
-        var n = node
-        while let cur = n {
-            if cur.name == "turntable" { return true }
-            n = cur.parent
-        }
-        return false
+    /// Where the clickable parts are, in world space: round targets plus the tonearm as a segment.
+    /// The caller projects these to the screen, so no invisible geometry is needed.
+    var clickTargets: (points: [(Control, SCNVector3)], arm: (SCNVector3, SCNVector3)) {
+        var points: [(Control, SCNVector3)] = [(.playPause, knobNode.presentation.worldPosition)]
+        for (control, cap) in buttons { points.append((control, cap.presentation.worldPosition)) }
+        let p = arm.presentation
+        return (points, (p.convertPosition(SCNVector3(0, 0, -0.55), to: nil), p.convertPosition(SCNVector3(0, -0.05, 2.5), to: nil)))
+    }
+
+    /// Dip a skip button as if it had been pushed.
+    func press(_ control: Control) {
+        guard let cap = buttons[control] else { return }
+        let down = SCNAction.moveBy(x: 0, y: -0.035, z: 0, duration: 0.07)
+        cap.runAction(.sequence([down, down.reversed()]))
     }
 }

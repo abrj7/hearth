@@ -13,7 +13,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         desktop = DesktopController(state: state)
-        desktop.onTurntableClick = { [weak self] in self?.monitor.togglePlayPause() }
+        desktop.onControl = { [weak self] control in
+            switch control {
+            case .playPause: self?.monitor.togglePlayPause()
+            case .next: self?.monitor.skip(forward: true)
+            case .previous: self?.monitor.skip(forward: false)
+            }
+        }
         state.onChange = { [weak self] in
             DispatchQueue.main.async { self?.desktop.applySettings() }
         }
@@ -96,6 +102,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             sub.isEnabled = false
             menu.addItem(sub)
             menu.addItem(item(state.isPlaying ? "Pause" : "Play", #selector(togglePlayback)))
+            menu.addItem(item("Next", #selector(nextTrack)))
+            menu.addItem(item("Previous", #selector(previousTrack)))
         } else {
             let idle = NSMenuItem(title: "Play something in Spotify or Apple Music", action: nil, keyEquivalent: "")
             idle.isEnabled = false
@@ -123,6 +131,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func togglePlayback() { monitor.togglePlayPause() }
+    @objc private func nextTrack() { monitor.skip(forward: true) }
+    @objc private func previousTrack() { monitor.skip(forward: false) }
     @objc private func pickScene(_ sender: NSMenuItem) {
         if let p = TurntableScene.Preset(rawValue: sender.tag) { state.pick(p) }
     }
