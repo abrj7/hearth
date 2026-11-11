@@ -2,9 +2,9 @@
 import PackageDescription
 
 let package = Package(
-    name: "Vinyl",
+    name: "Hearth",
     platforms: [.macOS(.v14)],
     targets: [
-        .executableTarget(name: "Vinyl", path: "Sources/Vinyl")
+        .executableTarget(name: "Hearth", path: "Sources/Hearth")
     ]
 )

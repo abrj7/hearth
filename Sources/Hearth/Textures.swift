@@ -412,30 +412,198 @@ enum Tex {
         }
     }
 
-    /// App icon: a record on a warm tile.
+    // MARK: Desk items
+
+    private static func drawText(_ ctx: CGContext, _ body: () -> Void) {
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+        body()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    /// Glowing amber digits on dark glass.
+    static func clockFace(time: String, suffix: String) -> CGImage {
+        draw(1024, 368) { ctx in
+            ctx.setFillColor(color((0.025, 0.022, 0.02)))
+            ctx.fill(CGRect(x: 0, y: 0, width: 1024, height: 368))
+            let amber = NSColor(srgbRed: 1, green: 0.66, blue: 0.26, alpha: 1)
+            let para = NSMutableParagraphStyle()
+            para.alignment = .center
+            func rounded(_ size: CGFloat, _ weight: NSFont.Weight) -> NSFont {
+                let base = NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight)
+                return base.fontDescriptor.withDesign(.rounded).flatMap { NSFont(descriptor: $0, size: size) } ?? base
+            }
+            let shadow = NSShadow()
+            shadow.shadowColor = amber.withAlphaComponent(0.7)
+            shadow.shadowBlurRadius = 26
+            drawText(ctx) {
+                let shift: CGFloat = suffix.isEmpty ? 0 : -50
+                NSAttributedString(string: time, attributes: [.font: rounded(250, .semibold), .foregroundColor: amber, .paragraphStyle: para, .shadow: shadow])
+                    .draw(in: CGRect(x: shift, y: 26, width: 1024, height: 300))
+                if !suffix.isEmpty {
+                    NSAttributedString(string: suffix, attributes: [.font: rounded(64, .semibold), .foregroundColor: amber.withAlphaComponent(0.85), .shadow: shadow])
+                        .draw(at: CGPoint(x: 868, y: 70))
+                }
+            }
+        }
+    }
+
+    /// One page of a tear-off calendar.
+    static func calendarPage(_ date: Date) -> CGImage {
+        draw(680, 920) { ctx in
+            var r = RNG(5)
+            ctx.setFillColor(color((0.96, 0.94, 0.89)))
+            ctx.fill(CGRect(x: 0, y: 0, width: 680, height: 920))
+            for _ in 0..<5000 {
+                ctx.setFillColor(color((0.3, 0.2, 0.1), r.f(0.01, 0.04)))
+                ctx.fill(CGRect(x: r.f(0, 680), y: r.f(0, 920), width: 2, height: 2))
+            }
+            ctx.setFillColor(color((0.72, 0.23, 0.16)))
+            ctx.fill(CGRect(x: 0, y: 700, width: 680, height: 220))
+            ctx.setFillColor(color((0.2, 0.15, 0.12), 0.8))
+            for x in [200, 480] as [CGFloat] { ctx.fillEllipse(in: CGRect(x: x - 14, y: 868, width: 28, height: 28)) }
+
+            let f = DateFormatter()
+            func text(_ format: String) -> String { f.dateFormat = format; return f.string(from: date) }
+            let para = NSMutableParagraphStyle()
+            para.alignment = .center
+            let ink = NSColor(srgbRed: 0.14, green: 0.11, blue: 0.09, alpha: 1)
+            func serif(_ size: CGFloat, _ weight: NSFont.Weight) -> NSFont {
+                let base = NSFont.systemFont(ofSize: size, weight: weight)
+                return base.fontDescriptor.withDesign(.serif).flatMap { NSFont(descriptor: $0, size: size) } ?? base
+            }
+            drawText(ctx) {
+                NSAttributedString(string: text("MMMM").uppercased(), attributes: [.font: NSFont.systemFont(ofSize: 62, weight: .bold), .kern: 10, .foregroundColor: NSColor(white: 1, alpha: 0.95), .paragraphStyle: para])
+                    .draw(in: CGRect(x: 0, y: 742, width: 680, height: 84))
+                NSAttributedString(string: text("d"), attributes: [.font: serif(430, .bold), .foregroundColor: ink, .paragraphStyle: para])
+                    .draw(in: CGRect(x: 0, y: 190, width: 680, height: 500))
+                NSAttributedString(string: text("EEEE").uppercased(), attributes: [.font: NSFont.systemFont(ofSize: 52, weight: .semibold), .kern: 8, .foregroundColor: ink.withAlphaComponent(0.7), .paragraphStyle: para])
+                    .draw(in: CGRect(x: 0, y: 84, width: 680, height: 70))
+            }
+        }
+    }
+
+    /// The view out of the window for a given kind of weather, by day or by night.
+    static func sky(_ w: Weather, night: Bool) -> CGImage {
+        let W: CGFloat = 1024, H: CGFloat = 768
+        var top: RGB, low: RGB, cloud: RGB
+        var clouds: Int
+        switch w {
+        case .clear: top = (0.30, 0.56, 0.90); low = (0.80, 0.90, 0.98); cloud = (1, 1, 1); clouds = 2
+        case .partly: top = (0.34, 0.58, 0.88); low = (0.82, 0.90, 0.97); cloud = (1, 1, 1); clouds = 8
+        case .cloudy: top = (0.58, 0.62, 0.67); low = (0.80, 0.82, 0.84); cloud = (0.70, 0.72, 0.75); clouds = 18
+        case .fog: top = (0.78, 0.79, 0.80); low = (0.86, 0.86, 0.85); cloud = (0.9, 0.9, 0.9); clouds = 4
+        case .rain: top = (0.36, 0.40, 0.46); low = (0.60, 0.63, 0.66); cloud = (0.30, 0.33, 0.38); clouds = 20
+        case .snow: top = (0.72, 0.75, 0.80); low = (0.90, 0.91, 0.93); cloud = (0.82, 0.84, 0.87); clouds = 14
+        case .storm: top = (0.17, 0.19, 0.24); low = (0.40, 0.42, 0.46); cloud = (0.12, 0.13, 0.17); clouds = 22
+        }
+        let clearish = w == .clear || w == .partly
+        if night {
+            top = clearish ? (0.02, 0.035, 0.10) : (0.05, 0.055, 0.075)
+            low = clearish ? (0.09, 0.13, 0.26) : (0.12, 0.13, 0.16)
+            cloud = clearish ? (0.16, 0.19, 0.30) : (0.09, 0.10, 0.13)
+        }
+        var r = RNG(UInt64(w.hashValue & 0xFF) &+ 31)
+        r = RNG(UInt64(Weather.allCases.firstIndex(of: w) ?? 0) &+ 31)
+
+        let base = draw(Int(W), Int(H)) { ctx in
+            let grad = CGGradient(colorsSpace: srgb, colors: [color(low), color(top)] as CFArray, locations: [0, 1])!
+            ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: H * 0.15), end: CGPoint(x: 0, y: H), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+            if clearish && !night {
+                let sun = CGGradient(colorsSpace: srgb, colors: [color((1, 0.98, 0.88), 0.95), color((1, 0.95, 0.8), 0)] as CFArray, locations: [0, 1])!
+                ctx.drawRadialGradient(sun, startCenter: CGPoint(x: 790, y: 600), startRadius: 0, endCenter: CGPoint(x: 790, y: 600), endRadius: 260, options: [])
+            }
+            for _ in 0..<clouds {
+                let cx = r.f(-60, W + 60), cy = r.f(H * 0.3, H * 0.98), scale = r.f(0.6, 1.5)
+                for _ in 0..<7 {
+                    let ew = r.f(90, 220) * scale, eh = ew * r.f(0.32, 0.5)
+                    ctx.setFillColor(color(cloud, night ? 0.6 : r.f(0.55, 0.9)))
+                    ctx.fillEllipse(in: CGRect(x: cx + r.f(-120, 120) * scale - ew / 2, y: cy + r.f(-30, 30) * scale - eh / 2, width: ew, height: eh))
+                }
+            }
+        }
+        let soft = blur(base, 11)
+
+        return draw(Int(W), Int(H)) { ctx in
+            ctx.draw(soft, in: CGRect(x: 0, y: 0, width: W, height: H))
+            if night && clearish {
+                for _ in 0..<170 {
+                    let size = r.f(1.2, 3.4)
+                    ctx.setFillColor(color((1, 1, 0.95), r.f(0.3, 0.95)))
+                    ctx.fillEllipse(in: CGRect(x: r.f(0, W), y: r.f(H * 0.28, H), width: size, height: size))
+                }
+                let halo = CGGradient(colorsSpace: srgb, colors: [color((0.85, 0.9, 1), 0.35), color((0.85, 0.9, 1), 0)] as CFArray, locations: [0, 1])!
+                ctx.drawRadialGradient(halo, startCenter: CGPoint(x: 760, y: 590), startRadius: 0, endCenter: CGPoint(x: 760, y: 590), endRadius: 150, options: [])
+                ctx.setFillColor(color((0.96, 0.96, 0.9)))
+                ctx.fillEllipse(in: CGRect(x: 760 - 42, y: 590 - 42, width: 84, height: 84))
+            }
+            // Distant hills, then a nearer line of trees.
+            let snowy = w == .snow
+            var hills: [RGB] = snowy ? [(0.80, 0.83, 0.87), (0.66, 0.70, 0.75)] : [(0.42, 0.52, 0.50), (0.22, 0.32, 0.28)]
+            if !clearish && !snowy { hills = [(0.40, 0.44, 0.46), (0.24, 0.28, 0.29)] }
+            if night { hills = [(0.045, 0.06, 0.09), (0.02, 0.028, 0.045)] }
+            for (i, c) in hills.enumerated() {
+                let baseY = H * (0.30 - CGFloat(i) * 0.09)
+                let a1 = r.f(18, 40), a2 = r.f(6, 16), p1 = r.f(0, 6), p2 = r.f(0, 6)
+                ctx.beginPath()
+                ctx.move(to: CGPoint(x: 0, y: 0))
+                var x: CGFloat = 0
+                while x <= W {
+                    let bumps = i == 1 ? abs(sin(x * 0.09 + p2)) * 14 : 0
+                    ctx.addLine(to: CGPoint(x: x, y: baseY + a1 * sin(x * 0.006 + p1) + a2 * sin(x * 0.02 + p2) + bumps))
+                    x += 4
+                }
+                ctx.addLine(to: CGPoint(x: W, y: 0))
+                ctx.closePath()
+                ctx.setFillColor(color(c))
+                ctx.fillPath()
+            }
+            if night {
+                // A few lit windows far away.
+                for _ in 0..<9 {
+                    ctx.setFillColor(color((1, 0.78, 0.42), r.f(0.5, 0.95)))
+                    ctx.fill(CGRect(x: r.f(40, W - 40), y: r.f(H * 0.06, H * 0.2), width: 5, height: 6))
+                }
+            }
+            if w == .fog {
+                ctx.setFillColor(color((0.86, 0.86, 0.85), night ? 0.25 : 0.6))
+                ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
+            }
+        }
+    }
+
+    /// Soft round dot used for snowflakes and raindrops.
+    static let dot: CGImage = draw(32, 32) { ctx in
+        let g = CGGradient(colorsSpace: srgb, colors: [color((1, 1, 1), 1), color((1, 1, 1), 0.8), color((1, 1, 1), 0)] as CFArray, locations: [0, 0.5, 1])!
+        ctx.drawRadialGradient(g, startCenter: CGPoint(x: 16, y: 16), startRadius: 0, endCenter: CGPoint(x: 16, y: 16), endRadius: 16, options: [])
+    }
+
+    /// App icon: a candle flame on a warm tile.
     static func appIcon() -> CGImage {
         draw(1024, 1024) { ctx in
             let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
             ctx.addPath(CGPath(roundedRect: tile, cornerWidth: 185, cornerHeight: 185, transform: nil))
             ctx.clip()
-            let bg = CGGradient(colorsSpace: srgb, colors: [color((0.78, 0.40, 0.18)), color((0.93, 0.62, 0.34))] as CFArray, locations: [0, 1])!
+            let bg = CGGradient(colorsSpace: srgb, colors: [color((0.20, 0.10, 0.06)), color((0.42, 0.20, 0.10))] as CFArray, locations: [0, 1])!
             ctx.drawLinearGradient(bg, start: CGPoint(x: 0, y: 100), end: CGPoint(x: 0, y: 924), options: [])
-            ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 40, color: color((0, 0, 0), 0.45))
-            ctx.setFillColor(color((0.06, 0.06, 0.07)))
-            ctx.fillEllipse(in: CGRect(x: 512 - 320, y: 512 - 320, width: 640, height: 640))
-            ctx.setShadow(offset: .zero, blur: 0, color: nil)
-            for i in 0..<26 {
-                let rad = 130 + CGFloat(i) * 7.2
-                ctx.setStrokeColor(color((1, 1, 1), i % 5 == 0 ? 0.10 : 0.04))
-                ctx.setLineWidth(2)
-                ctx.strokeEllipse(in: CGRect(x: 512 - rad, y: 512 - rad, width: rad * 2, height: rad * 2))
+            let glow = CGGradient(colorsSpace: srgb, colors: [color((1, 0.62, 0.22), 0.55), color((1, 0.5, 0.15), 0)] as CFArray, locations: [0, 1])!
+            ctx.drawRadialGradient(glow, startCenter: CGPoint(x: 512, y: 540), startRadius: 0, endCenter: CGPoint(x: 512, y: 540), endRadius: 400, options: [])
+            func flame(_ scale: CGFloat, _ c: RGB) {
+                let p = CGMutablePath()
+                p.move(to: CGPoint(x: 512, y: 300))
+                p.addCurve(to: CGPoint(x: 512, y: 300 + 470 * scale), control1: CGPoint(x: 512 - 290 * scale, y: 300 + 60 * scale), control2: CGPoint(x: 512 - 60 * scale, y: 300 + 300 * scale))
+                p.addCurve(to: CGPoint(x: 512, y: 300), control1: CGPoint(x: 512 + 60 * scale, y: 300 + 300 * scale), control2: CGPoint(x: 512 + 290 * scale, y: 300 + 60 * scale))
+                ctx.addPath(p)
+                ctx.setFillColor(color(c))
+                ctx.fillPath()
             }
-            ctx.setFillColor(color((0.96, 0.88, 0.72)))
-            ctx.fillEllipse(in: CGRect(x: 512 - 110, y: 512 - 110, width: 220, height: 220))
-            ctx.setFillColor(color((0.80, 0.33, 0.16)))
-            ctx.fillEllipse(in: CGRect(x: 512 - 70, y: 512 - 70, width: 140, height: 140))
-            ctx.setFillColor(color((0.06, 0.06, 0.07)))
-            ctx.fillEllipse(in: CGRect(x: 512 - 14, y: 512 - 14, width: 28, height: 28))
+            flame(1, (0.98, 0.52, 0.16))
+            flame(0.66, (1, 0.76, 0.32))
+            flame(0.36, (1, 0.95, 0.75))
+            ctx.setFillColor(color((0.93, 0.88, 0.78)))
+            ctx.fill(CGRect(x: 512 - 120, y: 100, width: 240, height: 170))
+            ctx.setFillColor(color((0.1, 0.07, 0.05)))
+            ctx.fill(CGRect(x: 512 - 5, y: 262, width: 10, height: 46))
         }
     }
 }

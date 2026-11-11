@@ -22,7 +22,7 @@ struct Track: Equatable {
 
 /// AppleScript runs on one background queue so a permission prompt never freezes the UI.
 enum Script {
-    static let queue = DispatchQueue(label: "vinyl.applescript")
+    static let queue = DispatchQueue(label: "hearth.applescript")
 
     static func run(_ source: String) -> NSAppleEventDescriptor? {
         var error: NSDictionary?

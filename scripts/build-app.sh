@@ -1,15 +1,15 @@
 #!/bin/bash
-# Builds dist/Vinyl.app. Pass --install to also copy it into /Applications and launch it.
+# Builds dist/Hearth.app. Pass --install to also copy it into /Applications and launch it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 swift build -c release
-BIN=.build/release/Vinyl
-APP=dist/Vinyl.app
+BIN=.build/release/Hearth
+APP=dist/Hearth.app
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN" "$APP/Contents/MacOS/Vinyl"
+cp "$BIN" "$APP/Contents/MacOS/Hearth"
 
 # App icon, drawn by the app itself.
 ICONSET=$(mktemp -d)/AppIcon.iconset
@@ -28,10 +28,10 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>Vinyl</string>
-  <key>CFBundleDisplayName</key><string>Vinyl</string>
-  <key>CFBundleIdentifier</key><string>com.abrj7.vinyl</string>
-  <key>CFBundleExecutable</key><string>Vinyl</string>
+  <key>CFBundleName</key><string>Hearth</string>
+  <key>CFBundleDisplayName</key><string>Hearth</string>
+  <key>CFBundleIdentifier</key><string>com.abrj7.hearth</string>
+  <key>CFBundleExecutable</key><string>Hearth</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
@@ -39,7 +39,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSAppleEventsUsageDescription</key><string>Vinyl reads the current track from Spotify and Apple Music, and plays or pauses when you click the turntable.</string>
+  <key>NSAppleEventsUsageDescription</key><string>Hearth reads the current track from Spotify and Apple Music, and plays, pauses or skips when you click the record player.</string>
 </dict>
 </plist>
 PLIST
@@ -48,9 +48,9 @@ codesign --force --sign - "$APP" >/dev/null 2>&1
 echo "Built $APP"
 
 if [[ "${1:-}" == "--install" ]]; then
-  pkill -x Vinyl 2>/dev/null && sleep 1 || true
-  rm -rf /Applications/Vinyl.app
-  cp -R "$APP" /Applications/Vinyl.app
-  open /Applications/Vinyl.app
-  echo "Installed to /Applications/Vinyl.app"
+  pkill -x Hearth 2>/dev/null && sleep 1 || true
+  rm -rf /Applications/Hearth.app
+  cp -R "$APP" /Applications/Hearth.app
+  open /Applications/Hearth.app
+  echo "Installed to /Applications/Hearth.app"
 fi
