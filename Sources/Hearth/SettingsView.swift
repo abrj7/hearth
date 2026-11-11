@@ -11,8 +11,8 @@ struct SettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 10) {
-                Image(systemName: "opticaldisc.fill").font(.system(size: 20)).foregroundStyle(accent)
-                Text("vinyl").font(.system(size: 26, weight: .bold, design: .rounded))
+                Image(systemName: "flame.fill").font(.system(size: 20)).foregroundStyle(accent)
+                Text("hearth").font(.system(size: 26, weight: .bold, design: .rounded))
             }
             .padding(.top, 14)
 
@@ -21,8 +21,31 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Scene").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
                 HStack(spacing: 12) {
-                    ForEach(TurntableScene.Preset.allCases) { sceneCard($0) }
+                    ForEach(DeskScene.Preset.allCases) { sceneCard($0) }
                 }
+            }
+            .padding(14)
+            .background(card, in: RoundedRectangle(cornerRadius: 14))
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("In the room").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                    ForEach(DeskItem.allCases) { itemChip($0) }
+                }
+                HStack(spacing: 12) {
+                    Image(systemName: "cloud.sun").font(.system(size: 13)).foregroundStyle(.secondary).frame(width: 20)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Weather outside").font(.system(size: 13, weight: .medium))
+                        Text(weatherCaption).font(.system(size: 11)).foregroundStyle(.tertiary)
+                    }
+                    Spacer()
+                    Picker("", selection: $state.weatherMode) {
+                        Text("Live").tag("live")
+                        ForEach([Weather.clear, .cloudy, .rain, .snow], id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented).labelsHidden().frame(width: 300)
+                }
+                .padding(.top, 2)
             }
             .padding(14)
             .background(card, in: RoundedRectangle(cornerRadius: 14))
@@ -99,7 +122,30 @@ struct SettingsView: View {
         .background(card, in: RoundedRectangle(cornerRadius: 14))
     }
 
-    private func sceneCard(_ p: TurntableScene.Preset) -> some View {
+    private var weatherCaption: String {
+        guard state.weatherMode == "live" else { return "Chosen by hand" }
+        guard let live = state.liveWeather else { return "Looking up the weather where you are…" }
+        return "\(live.weather.title), \(Int(live.celsius.rounded()))°C right now"
+    }
+
+    private func itemChip(_ item: DeskItem) -> some View {
+        let on = state.items.contains(item)
+        return Button {
+            state.toggle(item)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: item.symbol).font(.system(size: 12))
+                Text(item.title).font(.system(size: 12, weight: .medium)).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
+            .foregroundStyle(on ? Color.black.opacity(0.85) : Color.white.opacity(0.7))
+            .background(on ? accent : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func sceneCard(_ p: DeskScene.Preset) -> some View {
         let selected = state.preset == p
         return Button {
             state.pick(p)

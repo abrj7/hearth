@@ -12,7 +12,7 @@ final class AppState: ObservableObject {
     @Published var isPlaying = false
     @Published var artwork: NSImage?
     @Published var thumbnails: [NSImage] = []
-    @Published var preset: TurntableScene.Preset { didSet { defaults.set(preset.rawValue, forKey: "preset"); onChange?() } }
+    @Published var preset: DeskScene.Preset { didSet { defaults.set(preset.rawValue, forKey: "preset"); onChange?() } }
     @Published var sizeIndex: Int { didSet { defaults.set(sizeIndex, forKey: "size"); onChange?() } }
     @Published var transparent: Bool { didSet { defaults.set(transparent, forKey: "transparent"); onChange?() } }
     @Published var launchAtLogin: Bool {
@@ -21,23 +21,34 @@ final class AppState: ObservableObject {
             do {
                 if launchAtLogin { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             } catch {
-                NSLog("Vinyl: launch at login failed: \(error.localizedDescription)")
+                NSLog("Hearth: launch at login failed: \(error.localizedDescription)")
             }
         }
     }
     /// Follow the clock: Daylight from 6:30 to 18:30, Lamplight otherwise.
     @Published var autoScene: Bool { didSet { defaults.set(autoScene, forKey: "autoScene"); syncSceneToClock() } }
     @Published var showTitle: Bool { didSet { defaults.set(showTitle, forKey: "showTitle"); onChange?() } }
+    /// Which things are in the room.
+    @Published var items: Set<DeskItem> { didSet { defaults.set(items.map(\.rawValue), forKey: "items"); onChange?() } }
+    /// "live" follows the real weather; otherwise a `Weather` raw value chosen by hand.
+    @Published var weatherMode: String { didSet { defaults.set(weatherMode, forKey: "weatherMode"); onChange?() } }
+    @Published var liveWeather: WeatherReading? { didSet { onChange?() } }
+    var weather: Weather { Weather(rawValue: weatherMode) ?? liveWeather?.weather ?? .clear }
+
+    func toggle(_ item: DeskItem) {
+        if items.contains(item) { items.remove(item) } else { items.insert(item) }
+    }
+
     var onChange: (() -> Void)?
     private var clock: Timer?
 
     /// A scene the user chose by hand; this switches the automatic mode off.
-    func pick(_ p: TurntableScene.Preset) {
+    func pick(_ p: DeskScene.Preset) {
         if autoScene { autoScene = false }
         preset = p
     }
 
-    static func sceneForNow(_ date: Date = Date()) -> TurntableScene.Preset {
+    static func sceneForNow(_ date: Date = Date()) -> DeskScene.Preset {
         let c = Calendar.current.dateComponents([.hour, .minute], from: date)
         let minutes = (c.hour ?? 12) * 60 + (c.minute ?? 0)
         return (390..<1110).contains(minutes) ? .daylight : .lamplight
@@ -50,11 +61,17 @@ final class AppState: ObservableObject {
     }
 
     init() {
-        preset = TurntableScene.Preset(rawValue: defaults.integer(forKey: "preset")) ?? .daylight
+        preset = DeskScene.Preset(rawValue: defaults.integer(forKey: "preset")) ?? .daylight
         sizeIndex = defaults.object(forKey: "size") as? Int ?? 1
         transparent = defaults.bool(forKey: "transparent")
         launchAtLogin = SMAppService.mainApp.status == .enabled
         showTitle = defaults.object(forKey: "showTitle") as? Bool ?? true
+        if let saved = defaults.array(forKey: "items") as? [String] {
+            items = Set(saved.compactMap { DeskItem(rawValue: $0) })
+        } else {
+            items = DeskItem.defaults
+        }
+        weatherMode = defaults.string(forKey: "weatherMode") ?? "live"
         autoScene = defaults.object(forKey: "autoScene") as? Bool ?? true
         if autoScene { preset = Self.sceneForNow() }
         clock = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.syncSceneToClock() }
@@ -63,20 +80,21 @@ final class AppState: ObservableObject {
 
 /// Owns the wallpaper-level window and turns desktop clicks into turntable clicks.
 final class DesktopController: NSObject, SCNSceneRendererDelegate {
-    let scene: TurntableScene
+    let scene: DeskScene
     private let state: AppState
     private let window: NSWindow
     private let view: SCNView
     private var keepAliveUntil: CFTimeInterval = 0
     private var mouseDownAt: NSPoint?
-    private var appliedPreset: TurntableScene.Preset
+    private var appliedPreset: DeskScene.Preset
     private var appliedSize: Int
     private var appliedTransparent = false
-    var onControl: ((TurntableScene.Control) -> Void)?
+    private var ticker: Timer?
+    var onControl: ((DeskScene.Control) -> Void)?
 
     init(state: AppState) {
         self.state = state
-        scene = TurntableScene()
+        scene = DeskScene()
         for seed in [3, 4] as [UInt64] { scene.pushToStack(Tex.placeholderCover(seed: seed), animated: false) }
         appliedPreset = state.preset
         appliedSize = state.sizeIndex
@@ -106,7 +124,14 @@ final class DesktopController: NSObject, SCNSceneRendererDelegate {
         scene.apply(preset: state.preset, animated: false)
         applyTransparency(state.transparent)
         scene.setTitleCardEnabled(state.showTitle)
+        scene.setItems(state.items, animated: false)
+        scene.setWeather(state.weather, animated: false)
         window.orderFrontRegardless()
+        // Keep the clock and calendar current even when nothing else is moving.
+        ticker = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            if self.scene.tick() { self.kick(1) }
+        }
         kick(3)
 
         NotificationCenter.default.addObserver(self, selector: #selector(screensChanged),
@@ -145,7 +170,7 @@ final class DesktopController: NSObject, SCNSceneRendererDelegate {
         let image = view.snapshot()
         var rect = CGRect(origin: .zero, size: image.size)
         guard let cg = image.cgImage(forProposedRect: &rect, context: nil, hints: nil),
-              let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.appendingPathComponent("com.abrj7.vinyl") else { return }
+              let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.appendingPathComponent("com.abrj7.hearth") else { return }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         writePNG(cg, to: dir.appendingPathComponent("live.png").path)
         let t = state.track
@@ -172,6 +197,8 @@ final class DesktopController: NSObject, SCNSceneRendererDelegate {
 
     func applySettings() {
         scene.setTitleCardEnabled(state.showTitle)
+        if state.items != scene.items { scene.setItems(state.items, animated: true) }
+        if state.weather != scene.weather { scene.setWeather(state.weather, animated: true) }
         if state.transparent != appliedTransparent { applyTransparency(state.transparent) }
         if state.sizeIndex != appliedSize {
             appliedSize = state.sizeIndex
@@ -212,7 +239,7 @@ final class DesktopController: NSObject, SCNSceneRendererDelegate {
     }
 
     /// Which control, if any, is under this point of the view.
-    private func control(at point: CGPoint) -> TurntableScene.Control? {
+    private func control(at point: CGPoint) -> DeskScene.Control? {
         func screen(_ v: SCNVector3) -> CGPoint {
             let p = view.projectPoint(v)
             return CGPoint(x: p.x, y: p.y)

@@ -9,6 +9,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settingsWindow: NSWindow?
     private var currentKey: String?
     private var thumbnailWork: DispatchWorkItem?
+    private let weatherService = WeatherService()
+    private var thumbnailKey = ""
     private var debugSignal: DispatchSourceSignal?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -21,11 +23,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
         state.onChange = { [weak self] in
-            DispatchQueue.main.async { self?.desktop.applySettings() }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.desktop.applySettings()
+                // Previews show the same items and weather as the desktop.
+                let key = "\(self.state.items.map(\.rawValue).sorted())-\(self.state.weather.rawValue)"
+                if key != self.thumbnailKey {
+                    self.thumbnailKey = key
+                    self.refreshThumbnails()
+                }
+            }
         }
+        weatherService.onUpdate = { [weak self] reading in self?.state.liveWeather = reading }
+        weatherService.start()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "opticaldisc.fill", accessibilityDescription: "Vinyl")
+        statusItem.button?.image = NSImage(systemSymbolName: "flame.fill", accessibilityDescription: "Hearth")
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
@@ -57,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: Playback
 
     private func playbackChanged(_ track: Track?, _ playing: Bool) {
-        NSLog("Vinyl: %@ — %@ (%@)", playing ? "playing" : "paused", track?.title ?? "nothing", track?.player.displayName ?? "-")
+        NSLog("Hearth: %@ — %@ (%@)", playing ? "playing" : "paused", track?.title ?? "nothing", track?.player.displayName ?? "-")
         state.track = track
         state.isPlaying = playing
         desktop.setPlaying(playing)
@@ -67,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         desktop.setTrack(title: track.title, artist: track.artist)
         Artwork.fetch(for: track) { [weak self] image in
             guard let self, self.currentKey == track.key else { return }
-            NSLog("Vinyl: cover %@ for %@", image == nil ? "not found" : "loaded", track.album)
+            NSLog("Hearth: cover %@ for %@", image == nil ? "not found" : "loaded", track.album)
             let seed = UInt64(track.album.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF })
             let cover = image.flatMap { Tex.square($0) } ?? Tex.placeholderCover(seed: seed)
             self.state.artwork = NSImage(cgImage: cover, size: NSSize(width: 512, height: 512))
@@ -79,11 +92,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Re-render the three scene previews with the current cover (off the main thread).
     private func refreshThumbnails() {
         thumbnailWork?.cancel()
-        let art = desktop.scene.currentArt
+        var options = StillOptions()
+        options.art = desktop.scene.currentArt
+        options.size = CGSize(width: 480, height: 300)
+        options.items = state.items
+        options.weather = state.weather
+        options.title = state.track?.title ?? "Side One"
+        options.artist = state.track?.artist ?? "Your music here"
         let work = DispatchWorkItem { [weak self] in
-            let stack = (1...3).map { Tex.placeholderCover(seed: UInt64($0)) }
-            let images = TurntableScene.Preset.allCases.map {
-                renderStill(preset: $0, size: CGSize(width: 480, height: 300), art: art, stack: stack, playing: true)
+            options.stack = (1...3).map { Tex.placeholderCover(seed: UInt64($0)) }
+            let images = DeskScene.Preset.allCases.map { preset -> NSImage in
+                var o = options
+                o.preset = preset
+                return renderStill(o)
             }
             DispatchQueue.main.async { self?.state.thumbnails = images }
         }
@@ -111,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(idle)
         }
         menu.addItem(.separator())
-        for p in TurntableScene.Preset.allCases {
+        for p in DeskScene.Preset.allCases {
             let i = item(p.title, #selector(pickScene(_:)))
             i.tag = p.rawValue
             i.state = state.preset == p ? .on : .off
@@ -122,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(auto)
         menu.addItem(.separator())
         menu.addItem(item("Settings…", #selector(showSettings), key: ","))
-        menu.addItem(item("Quit Vinyl", #selector(quit), key: "q"))
+        menu.addItem(item("Quit Hearth", #selector(quit), key: "q"))
     }
 
     private func item(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
@@ -135,7 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func nextTrack() { monitor.skip(forward: true) }
     @objc private func previousTrack() { monitor.skip(forward: false) }
     @objc private func pickScene(_ sender: NSMenuItem) {
-        if let p = TurntableScene.Preset(rawValue: sender.tag) { state.pick(p) }
+        if let p = DeskScene.Preset(rawValue: sender.tag) { state.pick(p) }
     }
     @objc private func toggleAuto() { state.autoScene.toggle()
     }
@@ -143,7 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func showSettings() {
         if settingsWindow == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 560),
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 720),
                              styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
                              backing: .buffered, defer: false)
             w.titlebarAppearsTransparent = true
