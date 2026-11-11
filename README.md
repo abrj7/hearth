@@ -21,7 +21,7 @@ Each of these can be switched on or off on its own, in any combination:
 - **Clock** — a walnut block with glowing digits, in your Mac's 12 or 24 hour format
 - **Candle** — the flame flickers and lights the desk at night
 - **Calendar** — a tear-off wall calendar that turns over at midnight
-- **Window** — shows the live weather where you are: clear, cloudy, fog, rain, snow or storm, by day or night. The room's light dims with the clouds.
+- **Window** — shows the live weather in Waterloo, Ontario: clear, cloudy, fog, rain, snow or storm, by day or night. The room's light dims with the clouds.
 
 With the record player switched off, the clock moves to the middle of the desk.
 
@@ -36,11 +36,10 @@ With the record player switched off, the clock moves to the middle of the desk.
 - Menu bar icon for scenes, playback, settings and quit
 - Stops rendering completely when nothing is moving (no music, candle, rain or snow)
 
-## Weather and privacy
+## Weather
 
-Live weather needs no account or key. Once a day the app asks ipwho.is for a rough location
-based on the public IP address, rounds it to about 10 km, and then asks Open-Meteo for the
-current conditions there every 20 minutes. To avoid both requests, pick a weather by hand in settings.
+The window shows the current weather in Waterloo, Ontario, fetched from Open-Meteo every 20 minutes.
+No account, key or location lookup is involved. The coordinates are one line in `Weather.swift`.
 
 ## Build and install
 

@@ -124,8 +124,8 @@ struct SettingsView: View {
 
     private var weatherCaption: String {
         guard state.weatherMode == "live" else { return "Chosen by hand" }
-        guard let live = state.liveWeather else { return "Looking up the weather where you are…" }
-        return "\(live.weather.title), \(Int(live.celsius.rounded()))°C right now"
+        guard let live = state.liveWeather else { return "Looking up the weather in Waterloo…" }
+        return "\(live.weather.title), \(Int(live.celsius.rounded()))°C in Waterloo right now"
     }
 
     private func itemChip(_ item: DeskItem) -> some View {

@@ -51,12 +51,11 @@ struct WeatherReading: Equatable {
     var celsius: Double
 }
 
-/// Live weather with no account and no key: a coarse location from the public IP address
-/// (ipwho.is), then current conditions for that spot from Open-Meteo.
+/// Live weather for Waterloo, Ontario from Open-Meteo. No account, no key, no location lookup.
 final class WeatherService {
+    static let waterloo = (43.46, -80.52)
     var onUpdate: ((WeatherReading) -> Void)?
     private var timer: Timer?
-    private let defaults = UserDefaults.standard
     private let session: URLSession = {
         let c = URLSessionConfiguration.ephemeral
         c.timeoutIntervalForRequest = 10
@@ -70,7 +69,7 @@ final class WeatherService {
 
     func refresh() {
         Task {
-            guard let place = await location(), let reading = await conditions(at: place) else { return }
+            guard let reading = await conditions(at: Self.waterloo) else { return }
             await MainActor.run { self.onUpdate?(reading) }
         }
     }
@@ -79,25 +78,6 @@ final class WeatherService {
         guard let url = URL(string: string), let (data, response) = try? await session.data(from: url),
               (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
         return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-    }
-
-    /// Latitude and longitude rounded to about 10 km, looked up at most once a day.
-    private func location() async -> (Double, Double)? {
-        let age = Date().timeIntervalSince1970 - defaults.double(forKey: "placeTime")
-        if age < 24 * 3600, defaults.object(forKey: "placeLat") != nil {
-            return (defaults.double(forKey: "placeLat"), defaults.double(forKey: "placeLon"))
-        }
-        guard let d = await json("https://ipwho.is/?fields=success,latitude,longitude"),
-              let lat = d["latitude"] as? Double, let lon = d["longitude"] as? Double else {
-            // Offline or blocked: fall back to the last place we knew, however old.
-            guard defaults.object(forKey: "placeLat") != nil else { return nil }
-            return (defaults.double(forKey: "placeLat"), defaults.double(forKey: "placeLon"))
-        }
-        let rounded = ((lat * 10).rounded() / 10, (lon * 10).rounded() / 10)
-        defaults.set(rounded.0, forKey: "placeLat")
-        defaults.set(rounded.1, forKey: "placeLon")
-        defaults.set(Date().timeIntervalSince1970, forKey: "placeTime")
-        return rounded
     }
 
     private func conditions(at place: (Double, Double)) async -> WeatherReading? {
